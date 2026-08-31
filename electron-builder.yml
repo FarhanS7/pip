@@ -1,0 +1,26 @@
+{
+  "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
+  "appId": "com.pip.app",
+  "productName": "Pip",
+  "directories": {
+    "buildResources": "resources",
+    "output": "release"
+  },
+  "files": [
+    "out/**/*",
+    "!node_modules"
+  ],
+  "win": {
+    "target": ["nsis"],
+    "icon": "resources/icon.ico"
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "resources/icon.icns",
+    "category": "public.app-category.utilities"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false
+  }
+}
