@@ -48,16 +48,10 @@ export function createSTTProvider(type: STTProviderType): STTProvider {
           throw new Error('AssemblyAI STT provider session not yet initialized (B.5)')
         }
       }
-    case 'web-speech':
-      // Implemented in B.4
-      return {
-        name: 'web-speech',
-        displayName: 'Web Speech API (Local Fallback)',
-        requiresApiKey: false,
-        async createSession() {
-          throw new Error('Web Speech STT provider session not yet initialized (B.4)')
-        }
-      }
+    case 'web-speech': {
+      const { WebSpeechSTTProvider } = require('./web-speech-stt')
+      return new WebSpeechSTTProvider()
+    }
     default:
       throw new Error(`Unsupported STT provider type: ${type}`)
   }
