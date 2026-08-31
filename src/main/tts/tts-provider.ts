@@ -44,17 +44,10 @@ export function createTTSProvider(type: TTSProviderType): TTSProvider {
         },
         stop() {}
       }
-    case 'browser':
-      // Implemented in D.2
-      return {
-        name: 'browser',
-        displayName: 'Browser SpeechSynthesis (Fallback)',
-        requiresApiKey: false,
-        async speak() {
-          throw new Error('Browser SpeechSynthesis provider not yet initialized (D.2)')
-        },
-        stop() {}
-      }
+    case 'browser': {
+      const { BrowserTTSProvider } = require('./browser-tts')
+      return new BrowserTTSProvider()
+    }
     default:
       throw new Error(`Unsupported TTS provider type: ${type}`)
   }
