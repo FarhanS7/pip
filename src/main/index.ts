@@ -9,6 +9,7 @@
 
 import { app, BrowserWindow } from 'electron'
 import { createLogger } from './logger'
+import { registerIpcHandlers } from './ipc/handlers'
 
 const log = createLogger('shell')
 
@@ -32,6 +33,9 @@ if (process.platform === 'darwin') {
 
 app.whenReady().then(() => {
   log.info('App ready', { platform: process.platform, version: app.getVersion() })
+
+  // Register all IPC handlers for renderer → main communication
+  registerIpcHandlers()
 
   // TODO: A.2 — Initialize system tray
   // TODO: A.3 — Create panel window
