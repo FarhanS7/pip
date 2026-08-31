@@ -16,7 +16,7 @@ export type ErrorSeverity = 'critical' | 'high' | 'medium' | 'low'
  * Every error has a machine-readable code and a human-readable message.
  */
 export class PipError extends Error {
-  public readonly name = 'PipError'
+  public override name: string = 'PipError'
 
   constructor(
     public readonly code: string,
@@ -32,35 +32,35 @@ export class PipError extends Error {
 
 /** Errors from audio capture, microphone access, or audio processing. */
 export class AudioError extends PipError {
-  public override readonly name = 'AudioError'
+  public override name: string = 'AudioError'
 }
 
 /** Errors from AI provider communication (Claude, GPT-4o, Gemini). */
 export class AIProviderError extends PipError {
-  public override readonly name = 'AIProviderError'
+  public override name: string = 'AIProviderError'
 }
 
 /** Errors from OS accessibility tree reading (UIAutomation, AXUIElement). */
 export class AccessibilityError extends PipError {
-  public override readonly name = 'AccessibilityError'
+  public override name: string = 'AccessibilityError'
 }
 
 /** Errors from text-to-speech providers (ElevenLabs, OpenAI TTS, browser). */
 export class TTSError extends PipError {
-  public override readonly name = 'TTSError'
+  public override name: string = 'TTSError'
 }
 
 /** Errors from speech-to-text providers (AssemblyAI, Web Speech API). */
 export class STTError extends PipError {
-  public override readonly name = 'STTError'
+  public override name: string = 'STTError'
 }
 
 /** Errors from screen capture (desktopCapturer, ScreenCaptureKit). */
 export class ScreenCaptureError extends PipError {
-  public override readonly name = 'ScreenCaptureError'
+  public override name: string = 'ScreenCaptureError'
 }
 
 /** Errors from app configuration or missing environment variables. */
 export class ConfigError extends PipError {
-  public override readonly name = 'ConfigError'
+  public override name: string = 'ConfigError'
 }
