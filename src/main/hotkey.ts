@@ -20,7 +20,7 @@ import { createLogger } from './logger'
 
 const log = createLogger('hotkey')
 
-const DEFAULT_HOTKEY = 'Ctrl+Alt'
+const DEFAULT_HOTKEY = 'CommandOrControl+Alt+Space'
 
 /** Tracks whether the push-to-talk key is currently held down */
 let isPushToTalkActive = false

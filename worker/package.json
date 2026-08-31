@@ -2,8 +2,8 @@
   "name": "pip-proxy",
   "private": true,
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "dev": "npx wrangler dev",
+    "deploy": "npx wrangler deploy"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20241112.0",

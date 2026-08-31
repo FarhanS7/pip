@@ -52,8 +52,8 @@ app.whenReady().then(() => {
   // Initialize overlay windows (one per monitor)
   createOverlayWindows()
 
-  // Register global push-to-talk shortcut
-  registerGlobalHotkey('Ctrl+Alt')
+  // Register global push-to-talk shortcut (CommandOrControl+Alt+Space)
+  registerGlobalHotkey()
 })
 
 app.on('window-all-closed', () => {
