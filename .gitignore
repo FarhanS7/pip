@@ -1,0 +1,15 @@
+node_modules/
+dist/
+out/
+.env
+.env.local
+*.log
+.DS_Store
+Thumbs.db
+release/
+*.dmg
+*.exe
+*.AppImage
+native/*/build/
+native/*/Release/
+native/*/Debug/
