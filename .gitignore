@@ -5,6 +5,7 @@ out/
 .env.local
 .dev.vars
 .wrangler/
+*.tsbuildinfo
 *.log
 .DS_Store
 Thumbs.db
