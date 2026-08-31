@@ -7,9 +7,13 @@
  * References: PHASE_0_ARCHITECTURE.md §0.1 (Modular Monolith — Electron App)
  */
 
-import { app, BrowserWindow } from 'electron'
+import { app } from 'electron'
 import { createLogger } from './logger'
 import { registerIpcHandlers } from './ipc/handlers'
+import { createSystemTray, destroySystemTray } from './tray'
+import { createPanelWindow, togglePanelWindow, showPanelWindow } from './windows/panel-window'
+import { createOverlayWindows, destroyAllOverlayWindows } from './windows/overlay-window'
+import { registerGlobalHotkey, unregisterAllHotkeys } from './hotkey'
 
 const log = createLogger('shell')
 
@@ -37,11 +41,19 @@ app.whenReady().then(() => {
   // Register all IPC handlers for renderer → main communication
   registerIpcHandlers()
 
-  // TODO: A.2 — Initialize system tray
-  // TODO: A.3 — Create panel window
-  // TODO: A.4 — Create overlay window(s)
-  // TODO: A.5 — Register global hotkey
-  // TODO: A.6 — Register IPC handlers
+  // Initialize control panel window
+  createPanelWindow()
+
+  // Initialize system tray icon with left-click toggle
+  createSystemTray(() => {
+    togglePanelWindow()
+  })
+
+  // Initialize overlay windows (one per monitor)
+  createOverlayWindows()
+
+  // Register global push-to-talk shortcut
+  registerGlobalHotkey('Ctrl+Alt')
 })
 
 app.on('window-all-closed', () => {
@@ -52,13 +64,13 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   log.info('App shutting down — cleaning up resources')
-  // TODO: Unregister global shortcuts
-  // TODO: Destroy tray
-  // TODO: Close all windows
+  unregisterAllHotkeys()
+  destroyAllOverlayWindows()
+  destroySystemTray()
 })
 
 // Handle second instance attempt — focus existing window
 app.on('second-instance', () => {
   log.info('Second instance detected — focusing existing panel')
-  // TODO: Show and focus the panel window
+  showPanelWindow()
 })
