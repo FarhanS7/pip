@@ -23,14 +23,17 @@ export function registerIpcHandlers(): void {
 
   // ── Settings ─────────────────────────────────────────────────────────
   ipcMain.handle(IpcChannel.SETTINGS_GET, async () => {
-    // TODO: F.3 — Return settings from electron-store
+    const { getSettings } = await import('../state/settings')
     log.debug('Settings requested')
-    return {}
+    return getSettings()
   })
 
-  ipcMain.handle(IpcChannel.SETTINGS_SET, async (_event, payload: unknown) => {
-    // TODO: F.3 — Persist setting via electron-store
+  ipcMain.handle(IpcChannel.SETTINGS_SET, async (_event, payload: { key: string; value: unknown }) => {
+    const { setSetting } = await import('../state/settings')
     log.debug('Setting update requested', { payload })
+    if (payload && payload.key) {
+      setSetting(payload.key as never, payload.value as never)
+    }
     return { success: true }
   })
 
