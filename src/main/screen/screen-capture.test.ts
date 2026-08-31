@@ -2,6 +2,12 @@ import { describe, it, expect, vi } from 'vitest'
 
 // Mock Electron desktopCapturer and screen
 vi.mock('electron', () => {
+  const mockNativeImage = {
+    getSize: () => ({ width: 1920, height: 1080 }),
+    resize: (_opts: { width: number; height: number }) => mockNativeImage,
+    toJPEG: (_quality: number) => Buffer.from('fake-jpeg-data')
+  }
+
   return {
     desktopCapturer: {
       getSources: vi.fn(async () => [
@@ -9,13 +15,7 @@ vi.mock('electron', () => {
           id: 'screen:0:0',
           name: 'Screen 1',
           display_id: '100',
-          thumbnail: {
-            getSize: () => ({ width: 1920, height: 1080 }),
-            resize: (opts: { width: number; height: number }) => ({
-              toJPEG: () => Buffer.from('fake-jpeg-data')
-            }),
-            toJPEG: () => Buffer.from('fake-jpeg-data')
-          }
+          thumbnail: mockNativeImage
         }
       ])
     },
