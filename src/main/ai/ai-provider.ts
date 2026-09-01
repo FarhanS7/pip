@@ -40,7 +40,7 @@ export function createAIProvider(type: AIProviderType, _model?: string): AIProvi
       return {
         name: 'claude',
         displayName: 'Anthropic Claude',
-        defaultModel: 'claude-3-5-sonnet-20241022',
+        defaultModel: 'claude-sonnet-5',
         async *streamChat() {
           throw new Error('Claude vision provider not yet initialized (C.2)')
         }
