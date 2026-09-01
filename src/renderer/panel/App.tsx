@@ -26,19 +26,6 @@ const DEFAULT_SETTINGS: SettingsPayload = {
   cursorEnabled: true
 }
 
-declare global {
-  interface Window {
-    pipAPI?: {
-      getSettings: () => Promise<SettingsPayload>
-      setSetting: (key: keyof SettingsPayload, value: unknown) => Promise<void>
-      onVoiceStateChanged: (callback: (payload: VoiceStateChangedPayload) => void) => () => void
-      onSettingsChanged: (callback: (payload: SettingsPayload) => void) => () => void
-      triggerPushToTalkPress: () => void
-      triggerPushToTalkRelease: () => void
-    }
-  }
-}
-
 function App(): React.JSX.Element {
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'responding'>('idle')
   const [settings, setSettings] = useState<SettingsPayload>(DEFAULT_SETTINGS)

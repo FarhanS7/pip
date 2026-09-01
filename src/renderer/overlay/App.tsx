@@ -20,27 +20,7 @@ import {
   VoiceStateChangedPayload,
   AudioPowerLevelPayload
 } from '../../shared/types/ipc'
-
-interface PointDetectedPayload {
-  globalX?: number
-  globalY?: number
-  label?: string
-}
-
-interface TextChunkPayload {
-  chunk: string
-}
-
-declare global {
-  interface Window {
-    pipAPI?: {
-      onVoiceStateChanged: (callback: (payload: VoiceStateChangedPayload) => void) => () => void
-      onPowerLevelChanged: (callback: (payload: AudioPowerLevelPayload) => void) => () => void
-      onPointDetected: (callback: (payload: PointDetectedPayload) => void) => () => void
-      onTextChunk: (callback: (payload: TextChunkPayload) => void) => () => void
-    }
-  }
-}
+import { PointDetectedPayload, TextChunkPayload } from '../../shared/types/pip-api'
 
 function App(): React.JSX.Element {
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'responding'>('idle')
