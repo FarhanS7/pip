@@ -1,17 +1,119 @@
 /**
- * Overlay App — Transparent Overlay Root Component
+ * Overlay App — Transparent Multi-Monitor Overlay Root Component
  *
- * Placeholder until G.1 (Design System) is implemented.
- * Renders nothing visible — this is the transparent click-through layer.
+ * Mounts CursorBuddy, AudioWaveform, ProcessingIndicator, SpeechBubble, and BoundingBoxHighlight.
+ * Handles state synchronization over Electron IPC bridge.
+ *
+ * References:
+ *   PHASE_0_ARCHITECTURE.md §0.2 (renderer/overlay module)
+ *   PHASE_1_MODULES_AND_TASKS.md Task G.1-G.7 scoped checklist
  */
+
+import React, { useEffect, useState } from 'react'
+import './index.css'
+import { CursorBuddy } from './components/CursorBuddy'
+import { AudioWaveform } from './components/AudioWaveform'
+import { ProcessingIndicator } from './components/ProcessingIndicator'
+import { SpeechBubble } from './components/SpeechBubble'
+import { BoundingBoxHighlight, BoundingBoxRect } from './components/BoundingBoxHighlight'
+
 function App(): React.JSX.Element {
+  const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'responding'>('idle')
+  const [powerLevel, setPowerLevel] = useState<number>(0)
+  const [targetPos, setTargetPos] = useState<{ x: number; y: number }>({
+    x: Math.round(window.innerWidth / 2),
+    y: Math.round(window.innerHeight / 2)
+  })
+  const [responseText, setResponseText] = useState<string>('')
+  const [targetRect, setTargetRect] = useState<BoundingBoxRect | null>(null)
+  const [targetLabel, setTargetLabel] = useState<string>('')
+
+  useEffect(() => {
+    if (typeof window.pipAPI === 'undefined') return
+
+    const unsubVoice = window.pipAPI.onVoiceStateChanged((payload) => {
+      setVoiceState(payload.state as 'idle' | 'listening' | 'processing' | 'responding')
+      if (payload.state === 'listening') {
+        setResponseText('')
+        setTargetRect(null)
+      }
+    })
+
+    const unsubPower = window.pipAPI.onPowerLevelChanged((payload) => {
+      setPowerLevel(payload.level)
+    })
+
+    const unsubPoint = window.pipAPI.onPointDetected((payload) => {
+      if (payload.globalX !== undefined && payload.globalY !== undefined) {
+        setTargetPos({ x: payload.globalX, y: payload.globalY })
+        setTargetLabel(payload.label || '')
+        // Create 80x40 bounding box target rect around point
+        setTargetRect({
+          x: payload.globalX - 40,
+          y: payload.globalY - 20,
+          width: 80,
+          height: 40
+        })
+      }
+    })
+
+    const unsubChunk = window.pipAPI.onTextChunk((payload) => {
+      setResponseText((prev) => prev + payload.chunk)
+    })
+
+    return () => {
+      unsubVoice()
+      unsubPower()
+      unsubPoint()
+      unsubChunk()
+    }
+  }, [])
+
   return (
-    <div>
-      {/* G.2: AnimatedCursor will render here */}
-      {/* G.4: WaveformVisualizer will render here */}
-      {/* G.5: Processing spinner will render here */}
-      {/* G.6: SpeechBubble will render here */}
-      {/* G.7: ElementHighlight will render here */}
+    <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
+      {/* Target Element Highlight Box */}
+      <BoundingBoxHighlight
+        rect={targetRect}
+        label={targetLabel}
+        isVisible={voiceState === 'responding' && targetRect !== null}
+      />
+
+      {/* Animated Cursor Companion */}
+      <CursorBuddy
+        targetX={targetPos.x}
+        targetY={targetPos.y}
+        voiceState={voiceState}
+      />
+
+      {/* Auxiliary Overlay Widget Container positioned above Pip */}
+      <div
+        style={{
+          position: 'absolute',
+          left: `${targetPos.x}px`,
+          top: `${targetPos.y - 45}px`,
+          transform: 'translate(-50%, -100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: '8px',
+          pointerEvents: 'none',
+          zIndex: 9995
+        }}
+      >
+        <AudioWaveform
+          powerLevel={powerLevel}
+          isVisible={voiceState === 'listening'}
+        />
+
+        <ProcessingIndicator
+          isVisible={voiceState === 'processing'}
+        />
+
+        <SpeechBubble
+          text={responseText}
+          isVisible={voiceState === 'responding'}
+        />
+      </div>
     </div>
   )
 }
