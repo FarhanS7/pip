@@ -38,16 +38,10 @@ export type STTProviderType = 'assemblyai' | 'web-speech'
  */
 export function createSTTProvider(type: STTProviderType): STTProvider {
   switch (type) {
-    case 'assemblyai':
-      // Implemented in B.5
-      return {
-        name: 'assemblyai',
-        displayName: 'AssemblyAI Real-Time STT',
-        requiresApiKey: true,
-        async createSession() {
-          throw new Error('AssemblyAI STT provider session not yet initialized (B.5)')
-        }
-      }
+    case 'assemblyai': {
+      const { AssemblyAISTTProvider } = require('./assemblyai-stt')
+      return new AssemblyAISTTProvider()
+    }
     case 'web-speech': {
       const { WebSpeechSTTProvider } = require('./web-speech-stt')
       return new WebSpeechSTTProvider()
