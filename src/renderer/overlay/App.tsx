@@ -16,6 +16,31 @@ import { AudioWaveform } from './components/AudioWaveform'
 import { ProcessingIndicator } from './components/ProcessingIndicator'
 import { SpeechBubble } from './components/SpeechBubble'
 import { BoundingBoxHighlight, BoundingBoxRect } from './components/BoundingBoxHighlight'
+import {
+  VoiceStateChangedPayload,
+  AudioPowerLevelPayload
+} from '../../shared/types/ipc'
+
+interface PointDetectedPayload {
+  globalX?: number
+  globalY?: number
+  label?: string
+}
+
+interface TextChunkPayload {
+  chunk: string
+}
+
+declare global {
+  interface Window {
+    pipAPI?: {
+      onVoiceStateChanged: (callback: (payload: VoiceStateChangedPayload) => void) => () => void
+      onPowerLevelChanged: (callback: (payload: AudioPowerLevelPayload) => void) => () => void
+      onPointDetected: (callback: (payload: PointDetectedPayload) => void) => () => void
+      onTextChunk: (callback: (payload: TextChunkPayload) => void) => () => void
+    }
+  }
+}
 
 function App(): React.JSX.Element {
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'responding'>('idle')
@@ -29,21 +54,21 @@ function App(): React.JSX.Element {
   const [targetLabel, setTargetLabel] = useState<string>('')
 
   useEffect(() => {
-    if (typeof window.pipAPI === 'undefined') return
+    if (!window.pipAPI) return
 
-    const unsubVoice = window.pipAPI.onVoiceStateChanged((payload) => {
-      setVoiceState(payload.state as 'idle' | 'listening' | 'processing' | 'responding')
+    const unsubVoice = window.pipAPI.onVoiceStateChanged((payload: VoiceStateChangedPayload) => {
+      setVoiceState(payload.state)
       if (payload.state === 'listening') {
         setResponseText('')
         setTargetRect(null)
       }
     })
 
-    const unsubPower = window.pipAPI.onPowerLevelChanged((payload) => {
+    const unsubPower = window.pipAPI.onPowerLevelChanged((payload: AudioPowerLevelPayload) => {
       setPowerLevel(payload.level)
     })
 
-    const unsubPoint = window.pipAPI.onPointDetected((payload) => {
+    const unsubPoint = window.pipAPI.onPointDetected((payload: PointDetectedPayload) => {
       if (payload.globalX !== undefined && payload.globalY !== undefined) {
         setTargetPos({ x: payload.globalX, y: payload.globalY })
         setTargetLabel(payload.label || '')
@@ -57,7 +82,7 @@ function App(): React.JSX.Element {
       }
     })
 
-    const unsubChunk = window.pipAPI.onTextChunk((payload) => {
+    const unsubChunk = window.pipAPI.onTextChunk((payload: TextChunkPayload) => {
       setResponseText((prev) => prev + payload.chunk)
     })
 
