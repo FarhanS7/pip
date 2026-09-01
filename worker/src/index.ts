@@ -18,12 +18,13 @@ interface Env {
   ASSEMBLYAI_API_KEY?: string
   ELEVENLABS_API_KEY?: string
   ELEVENLABS_VOICE_ID?: string
+  PIP_SHARED_SECRET?: string
 }
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Pip-Auth'
 }
 
 export default {
@@ -41,6 +42,16 @@ export default {
           status: 200,
           headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
         })
+      }
+
+      // NOTE: Whichever task first implements a real call to this Worker (C.2, D.3, or B.5)
+      // MUST send the X-Pip-Auth header matching env.PIP_SHARED_SECRET.
+      const authHeader = request.headers.get('X-Pip-Auth')
+      if (!env.PIP_SHARED_SECRET || authHeader !== env.PIP_SHARED_SECRET) {
+        return new Response(
+          JSON.stringify({ error: 'Unauthorized: Missing or invalid X-Pip-Auth header' }),
+          { status: 401, headers: { ...CORS_HEADERS, 'content-type': 'application/json' } }
+        )
       }
 
       if (url.pathname === '/chat' && request.method === 'POST') {
