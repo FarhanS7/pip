@@ -22,28 +22,14 @@ export type TTSProviderType = 'elevenlabs' | 'openai-tts' | 'browser'
  */
 export function createTTSProvider(type: TTSProviderType): TTSProvider {
   switch (type) {
-    case 'elevenlabs':
-      // Implemented in D.3
-      return {
-        name: 'elevenlabs',
-        displayName: 'ElevenLabs Streaming TTS',
-        requiresApiKey: true,
-        async speak() {
-          throw new Error('ElevenLabs TTS provider not yet initialized (D.3)')
-        },
-        stop() {}
-      }
-    case 'openai-tts':
-      // Implemented in D.4
-      return {
-        name: 'openai-tts',
-        displayName: 'OpenAI TTS',
-        requiresApiKey: true,
-        async speak() {
-          throw new Error('OpenAI TTS provider not yet initialized (D.4)')
-        },
-        stop() {}
-      }
+    case 'elevenlabs': {
+      const { ElevenLabsTTSProvider } = require('./elevenlabs-tts')
+      return new ElevenLabsTTSProvider()
+    }
+    case 'openai-tts': {
+      const { OpenAITTSProvider } = require('./openai-tts')
+      return new OpenAITTSProvider()
+    }
     case 'browser': {
       const { BrowserTTSProvider } = require('./browser-tts')
       return new BrowserTTSProvider()
