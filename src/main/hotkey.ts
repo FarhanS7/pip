@@ -2,7 +2,7 @@
  * Global Hotkey Registration
  *
  * Registers a system-wide push-to-talk hotkey (default: CommandOrControl+Alt+Space).
- * Emits key-down and key-up events via IPC to the central state machine.
+ * Triggers voice state machine transitions on key-press and key-release.
  *
  * References:
  *   PHASE_0_ARCHITECTURE.md §0.1 (main/shell module)
@@ -14,9 +14,9 @@
  *   global OS-level keyup events for push-to-talk release without hand-rolling C++ native addons.
  */
 
-import { globalShortcut, BrowserWindow } from 'electron'
+import { globalShortcut } from 'electron'
 import { uIOhook } from 'uiohook-napi'
-import { IpcChannel } from './ipc/channels'
+import { voiceStateMachine } from './state/voice-state-machine'
 import { createLogger } from './logger'
 
 const log = createLogger('hotkey')
@@ -45,11 +45,8 @@ export function registerGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): boolean {
         isPushToTalkActive = true
         log.info('Push-to-talk activated', { hotkey })
 
-        // Notify all renderer windows that recording should start
-        broadcastToAllWindows(IpcChannel.VOICE_STATE_CHANGED, {
-          state: 'listening',
-          reason: 'hotkey-press'
-        })
+        // Transition voice state machine to listening
+        voiceStateMachine.transitionTo('listening', 'hotkey-press')
 
         // Start listening for key release
         startReleaseDetection(hotkey)
@@ -78,7 +75,10 @@ export function registerGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): boolean {
 export function unregisterGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): void {
   globalShortcut.unregister(hotkey)
   stopReleaseDetection()
-  isPushToTalkActive = false
+  if (isPushToTalkActive) {
+    isPushToTalkActive = false
+    voiceStateMachine.reset('hotkey-unregistered')
+  }
   log.info('Global hotkey unregistered', { hotkey })
 }
 
@@ -88,7 +88,10 @@ export function unregisterGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): void {
 export function unregisterAllHotkeys(): void {
   globalShortcut.unregisterAll()
   stopReleaseDetection()
-  isPushToTalkActive = false
+  if (isPushToTalkActive) {
+    isPushToTalkActive = false
+    voiceStateMachine.reset('hotkey-unregistered')
+  }
   log.info('All global hotkeys unregistered')
 }
 
@@ -143,22 +146,8 @@ function handleKeyRelease(): void {
 
   log.info('Push-to-talk deactivated')
 
-  broadcastToAllWindows(IpcChannel.VOICE_STATE_CHANGED, {
-    state: 'processing',
-    reason: 'hotkey-release'
-  })
-}
-
-/**
- * Broadcast an IPC message to all open BrowserWindows.
- */
-function broadcastToAllWindows(channel: string, payload: unknown): void {
-  const windows = BrowserWindow.getAllWindows()
-  for (const win of windows) {
-    if (!win.isDestroyed()) {
-      win.webContents.send(channel, payload)
-    }
-  }
+  // Transition voice state machine to processing
+  voiceStateMachine.transitionTo('processing', 'hotkey-release')
 }
 
 /**

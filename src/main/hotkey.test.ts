@@ -43,12 +43,14 @@ import {
   unregisterAllHotkeys,
   isPushToTalkCurrentlyActive
 } from './hotkey'
+import { voiceStateMachine } from './state/voice-state-machine'
 
 describe('Global Hotkey (Push-to-Talk)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
     registeredShortcutCallback = null
+    voiceStateMachine.reset()
     unregisterAllHotkeys()
   })
 
