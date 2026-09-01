@@ -35,36 +35,18 @@ export type AIProviderType = 'claude' | 'openai' | 'gemini'
  */
 export function createAIProvider(type: AIProviderType, _model?: string): AIProvider {
   switch (type) {
-    case 'claude':
-      // Implemented in C.2
-      return {
-        name: 'claude',
-        displayName: 'Anthropic Claude',
-        defaultModel: 'claude-sonnet-5',
-        async *streamChat() {
-          throw new Error('Claude vision provider not yet initialized (C.2)')
-        }
-      }
-    case 'openai':
-      // Implemented in C.3
-      return {
-        name: 'openai',
-        displayName: 'OpenAI GPT-4o',
-        defaultModel: 'gpt-4o',
-        async *streamChat() {
-          throw new Error('OpenAI vision provider not yet initialized (C.3)')
-        }
-      }
-    case 'gemini':
-      // Implemented in C.4
-      return {
-        name: 'gemini',
-        displayName: 'Google Gemini',
-        defaultModel: 'gemini-2.5-flash',
-        async *streamChat() {
-          throw new Error('Gemini vision provider not yet initialized (C.4)')
-        }
-      }
+    case 'claude': {
+      const { ClaudeProvider } = require('./claude-provider')
+      return new ClaudeProvider()
+    }
+    case 'openai': {
+      const { OpenAIProvider } = require('./openai-provider')
+      return new OpenAIProvider()
+    }
+    case 'gemini': {
+      const { GeminiProvider } = require('./gemini-provider')
+      return new GeminiProvider()
+    }
     default:
       throw new Error(`Unsupported AI provider type: ${type}`)
   }
