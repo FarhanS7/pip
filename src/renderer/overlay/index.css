@@ -1,0 +1,107 @@
+/**
+ * Pip Overlay UI — Glassmorphic Design System & Keyframe Animations
+ *
+ * References:
+ *   PHASE_0_ARCHITECTURE.md §0.2 (renderer/overlay module)
+ *   PHASE_1_MODULES_AND_TASKS.md Task G.1 scoped checklist
+ */
+
+:root {
+  --pip-cyan: #38bdf8;
+  --pip-cyan-glow: rgba(56, 189, 248, 0.45);
+  --pip-blue: #3b82f6;
+  --pip-blue-dark: #1e3a8a;
+  --pip-indigo: #6366f1;
+  --pip-bg-glass: rgba(15, 23, 42, 0.82);
+  --pip-border-glass: rgba(255, 255, 255, 0.15);
+  --pip-text-main: #f8fafc;
+  --pip-text-muted: #94a3b8;
+  --pip-radius: 16px;
+  --pip-font: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  user-select: none;
+}
+
+html, body, #root {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent !important;
+  font-family: var(--pip-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glassmorphic Panel Utility */
+.pip-glass-panel {
+  background: var(--pip-bg-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--pip-border-glass);
+  border-radius: var(--pip-radius);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45), 0 0 20px var(--pip-cyan-glow);
+  color: var(--pip-text-main);
+}
+
+/* Keyframe Animations */
+@keyframes floatBob {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@keyframes pulseOrbit {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.08);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+@keyframes wavePulse {
+  0%, 100% {
+    height: 4px;
+    opacity: 0.5;
+  }
+  50% {
+    height: 18px;
+    opacity: 1;
+  }
+}
+
+@keyframes boxGlow {
+  0%, 100% {
+    border-color: var(--pip-cyan);
+    box-shadow: 0 0 12px var(--pip-cyan-glow), inset 0 0 8px var(--pip-cyan-glow);
+  }
+  50% {
+    border-color: var(--pip-blue);
+    box-shadow: 0 0 24px var(--pip-cyan-glow), inset 0 0 16px var(--pip-cyan-glow);
+  }
+}
+
+.animate-float {
+  animation: floatBob 3s ease-in-out infinite;
+}
+
+.animate-spin-orbit {
+  animation: pulseOrbit 2.4s linear infinite;
+}
+
+.animate-box-glow {
+  animation: boxGlow 1.8s ease-in-out infinite;
+}
