@@ -1,20 +1,21 @@
 /**
  * Global Hotkey Registration
  *
- * Registers a system-wide push-to-talk hotkey (default: Ctrl+Alt).
+ * Registers a system-wide push-to-talk hotkey (default: CommandOrControl+Alt+Space).
  * Emits key-down and key-up events via IPC to the central state machine.
  *
  * References:
  *   PHASE_0_ARCHITECTURE.md §0.1 (main/shell module)
  *   PHASE_1_MODULES_AND_TASKS.md A.5 scoped checklist
  *
- * Gotcha: Electron's globalShortcut only fires on key-down, not key-up.
- * For push-to-talk, we need both. We use a two-key approach:
- *   - Register the shortcut to detect press
- *   - Use a polling/modifier-check approach for release detection
+ * Choice of key release detector:
+ *   uiohook-napi is a maintained, cross-platform (Windows & macOS) N-API native keyboard hook library.
+ *   Electron's globalShortcut only supports key-down events, so uiohook-napi is used to detect
+ *   global OS-level keyup events for push-to-talk release without hand-rolling C++ native addons.
  */
 
 import { globalShortcut, BrowserWindow } from 'electron'
+import { uIOhook } from 'uiohook-napi'
 import { IpcChannel } from './ipc/channels'
 import { createLogger } from './logger'
 
@@ -25,13 +26,16 @@ const DEFAULT_HOTKEY = 'CommandOrControl+Alt+Space'
 /** Tracks whether the push-to-talk key is currently held down */
 let isPushToTalkActive = false
 
-/** Interval ID for polling key release */
-let releaseCheckInterval: ReturnType<typeof setInterval> | null = null
+/** Keyup listener reference for clean removal */
+let onKeyUpListener: ((event: unknown) => void) | null = null
+
+/** 60-second safety-net fallback timeout ID */
+let safetyNetTimeout: ReturnType<typeof setTimeout> | null = null
 
 /**
  * Register the global push-to-talk hotkey.
  *
- * @param hotkey - The accelerator string (e.g. 'Ctrl+Alt'). Defaults to DEFAULT_HOTKEY.
+ * @param hotkey - The accelerator string (e.g. 'CommandOrControl+Alt+Space'). Defaults to DEFAULT_HOTKEY.
  * @returns true if registration succeeded, false if the shortcut was already taken
  */
 export function registerGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): boolean {
@@ -47,7 +51,7 @@ export function registerGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): boolean {
           reason: 'hotkey-press'
         })
 
-        // Start polling for key release
+        // Start listening for key release
         startReleaseDetection(hotkey)
       }
     })
@@ -89,43 +93,42 @@ export function unregisterAllHotkeys(): void {
 }
 
 /**
- * Poll for modifier key release.
- *
- * Electron's globalShortcut doesn't provide a key-up event.
- * We check if the modifier keys are still held every 50ms.
- * When they're released, we fire the stop event.
+ * Detect global key release using uiohook-napi OS-level keyup events.
+ * Includes a 60-second safety-net fallback timeout in case keyup drops.
  */
 function startReleaseDetection(_hotkey: string): void {
   stopReleaseDetection()
 
-  releaseCheckInterval = setInterval(() => {
-    // Check if modifier keys are still held
-    // On key release, the globalShortcut won't fire again,
-    // so if we haven't received a new press event, the key was released.
-    // This is a simplified approach — the full implementation would use
-    // native key-state polling (e.g., GetAsyncKeyState on Windows).
-    //
-    // For now, we use a timeout-based approach: if no new press event
-    // fires within 100ms of the last one, assume the key was released.
+  onKeyUpListener = (_event: unknown) => {
     if (isPushToTalkActive) {
-      // The globalShortcut fires repeatedly while held on some platforms.
-      // We'll detect release by the absence of repeat fires.
-      // This is handled via the re-registration pattern below.
+      handleKeyRelease()
     }
-  }, 50)
+  }
 
-  // Fallback: auto-release after 60 seconds (safety net)
-  setTimeout(() => {
+  uIOhook.on('keyup', onKeyUpListener)
+  try {
+    uIOhook.start()
+  } catch {
+    // Ignore if uIOhook event loop is already active
+  }
+
+  // Safety-net fallback timeout: auto-release after 60 seconds if release detection fails
+  safetyNetTimeout = setTimeout(() => {
     if (isPushToTalkActive) {
+      log.warn('Push-to-talk safety-net fallback timeout reached (60s)')
       handleKeyRelease()
     }
   }, 60000)
 }
 
 function stopReleaseDetection(): void {
-  if (releaseCheckInterval) {
-    clearInterval(releaseCheckInterval)
-    releaseCheckInterval = null
+  if (onKeyUpListener) {
+    uIOhook.off('keyup', onKeyUpListener)
+    onKeyUpListener = null
+  }
+  if (safetyNetTimeout) {
+    clearTimeout(safetyNetTimeout)
+    safetyNetTimeout = null
   }
 }
 
