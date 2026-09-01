@@ -19,7 +19,7 @@ const log = createLogger('settings')
 
 export const DEFAULT_SETTINGS: SettingsPayload = {
   selectedAIProvider: 'claude',
-  selectedAIModel: 'claude-3-5-sonnet-20241022',
+  selectedAIModel: 'claude-sonnet-5',
   selectedSTTProvider: 'assemblyai',
   selectedTTSProvider: 'elevenlabs',
   pushToTalkHotkey: 'CommandOrControl+Alt+Space',

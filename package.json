@@ -22,7 +22,8 @@
     "rebuild-native": "node-gyp rebuild --directory=native/accessibility-win"
   },
   "dependencies": {
-    "electron-store": "^10.0.0"
+    "electron-store": "^10.0.0",
+    "uiohook-napi": "^1.5.5"
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.1",

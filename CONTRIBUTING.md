@@ -12,5 +12,5 @@ One subtask = one commit. No bundling.
 
 ## Code Review
 - Writer model never reviews in the same session
-- Review model: always Claude Opus 4.6, always new session
+- Review model: always Claude Opus 5, always new session
 - 2-3 review cycles per task
