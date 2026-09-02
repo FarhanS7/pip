@@ -14,6 +14,7 @@ import { createSystemTray, destroySystemTray } from './tray'
 import { createPanelWindow, togglePanelWindow, showPanelWindow } from './windows/panel-window'
 import { createOverlayWindows, destroyAllOverlayWindows } from './windows/overlay-window'
 import { registerGlobalHotkey, unregisterAllHotkeys } from './hotkey'
+import { initOrchestrator } from './orchestrator'
 
 const log = createLogger('shell')
 
@@ -40,6 +41,9 @@ app.whenReady().then(() => {
 
   // Register all IPC handlers for renderer → main communication
   registerIpcHandlers()
+
+  // Initialize central orchestrator pipeline
+  initOrchestrator()
 
   // Initialize control panel window
   createPanelWindow()
