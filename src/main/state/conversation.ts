@@ -70,3 +70,7 @@ export class ConversationHistory {
     this.history = []
   }
 }
+
+// Singleton conversation history instance
+export const conversationHistory = new ConversationHistory(10)
+

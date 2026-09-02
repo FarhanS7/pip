@@ -10,14 +10,15 @@
  */
 
 import { BrowserWindow } from 'electron'
-import { voiceStateMachine, VoiceState } from './state/voice-state-machine'
+import { voiceStateMachine } from './state/voice-state-machine'
+import { VoiceState } from '../shared/types/ipc'
 import { getSettings } from './state/settings'
 import { createSTTProvider, STTSession } from './audio/stt-provider'
-import { createAIProvider, VisionPromptPayload } from './ai/ai-provider'
+import { createAIProvider, VisionPromptPayload, ChatMessage } from './ai/ai-provider'
 import { createTTSProvider, TTSProvider } from './tts/tts-provider'
-import { captureAllDisplays } from './screen/screen-capture'
+import { captureAllScreens, CapturedDisplay } from './screen/screen-capture'
 import { buildSystemPrompt, DisplayInfo } from './ai/system-prompt-builder'
-import { parseAIResponseTag } from './ai/response-parser'
+import { parsePointingCoordinates } from './ai/response-parser'
 import { mapToGlobalScreenCoordinates } from './state/coordinate-mapper'
 import { conversationHistory } from './state/conversation'
 import { IpcChannel } from './ipc/channels'
@@ -29,12 +30,11 @@ export class Orchestrator {
   private activeSttSession: STTSession | null = null
   private currentUtterance: string = ''
   private activeTtsProvider: TTSProvider | null = null
-  private isUnsubscribed: boolean = false
   private unsubscribeState: (() => void) | null = null
 
   constructor() {
     log.info('Initializing Central Orchestrator Pipeline')
-    this.unsubscribeState = voiceStateMachine.subscribe((state, reason) => {
+    this.unsubscribeState = voiceStateMachine.onStateChange((state, reason) => {
       this.handleStateChange(state, reason).catch((err) => {
         log.error('Error handling orchestrator state change', { state, reason, error: String(err) })
         voiceStateMachine.reset('orchestrator-error')
@@ -101,9 +101,9 @@ export class Orchestrator {
     let primaryJpegBase64: string | undefined = undefined
 
     try {
-      const screens = await captureAllDisplays()
+      const screens: CapturedDisplay[] = await captureAllScreens()
       if (screens.length > 0) {
-        primaryJpegBase64 = screens[0].base64Jpeg
+        primaryJpegBase64 = screens[0].jpegBase64
         capturedDisplays = screens.map((s, idx) => ({
           displayId: s.displayId,
           screenIndex: idx,
@@ -115,13 +115,23 @@ export class Orchestrator {
       log.error('Screen capture failed in orchestrator', { error: String(err) })
     }
 
-    // 2. Format user query and system prompt
+    // 2. Format messages from conversation history + current user query
     const userQuery = this.currentUtterance.trim() || 'Please look at my screen and guide me.'
-    conversationHistory.addTurn('user', userQuery)
+
+    const messages: ChatMessage[] = []
+    for (const exchange of conversationHistory.getHistory()) {
+      if (exchange.userTranscript) {
+        messages.push({ role: 'user', content: exchange.userTranscript })
+      }
+      if (exchange.assistantResponse) {
+        messages.push({ role: 'assistant', content: exchange.assistantResponse })
+      }
+    }
+    messages.push({ role: 'user', content: userQuery })
 
     const systemPrompt = buildSystemPrompt({ displays: capturedDisplays })
     const payload: VisionPromptPayload = {
-      messages: conversationHistory.getMessages(),
+      messages,
       screenshotJpegBase64: primaryJpegBase64,
       systemPrompt
     }
@@ -139,32 +149,33 @@ export class Orchestrator {
       const stream = aiProvider.streamChat(payload)
       for await (const chunk of stream) {
         fullResponse += chunk
-        this.broadcast(IpcChannel.AI_RESPONSE_CHUNK, { chunk })
+        this.broadcast(IpcChannel.AI_RESPONSE_CHUNK, { text: chunk })
       }
     } catch (err) {
       log.error('AI streaming failed in orchestrator', { error: String(err) })
       fullResponse = 'Sorry, I encountered an error communicating with the AI model.'
-      this.broadcast(IpcChannel.AI_RESPONSE_CHUNK, { chunk: fullResponse })
+      this.broadcast(IpcChannel.AI_RESPONSE_CHUNK, { text: fullResponse })
     }
 
     // 4. Parse response tags and coordinates
-    const parsed = parseAIResponseTag(fullResponse)
-    conversationHistory.addTurn('assistant', parsed.cleanText)
+    const parsed = parsePointingCoordinates(fullResponse)
+    conversationHistory.add(userQuery, parsed.spokenText)
 
-    if (parsed.point) {
+    if (parsed.coordinate) {
       const screenIdx = parsed.screenNumber ? Math.max(0, parsed.screenNumber - 1) : 0
       const mapped = mapToGlobalScreenCoordinates(
-        parsed.point,
+        parsed.coordinate,
         screenIdx,
         capturedDisplays
       )
 
-      log.info('AI Point detected and mapped', { point: parsed.point, mapped })
+      log.info('AI Point detected and mapped', { coordinate: parsed.coordinate, mapped })
 
-      this.broadcast(IpcChannel.AI_POINT_DETECTED, {
-        globalX: mapped.globalX,
-        globalY: mapped.globalY,
-        label: parsed.elementLabel ?? ''
+      this.broadcast(IpcChannel.CURSOR_POSITION, {
+        x: mapped.globalX,
+        y: mapped.globalY,
+        label: parsed.elementLabel,
+        screenIndex: mapped.screenIndex
       })
     }
 
@@ -174,7 +185,7 @@ export class Orchestrator {
 
     try {
       this.activeTtsProvider = createTTSProvider(ttsType)
-      await this.activeTtsProvider.speak(parsed.cleanText)
+      await this.activeTtsProvider.speak(parsed.spokenText)
     } catch (err) {
       log.error('TTS playback failed in orchestrator', { error: String(err) })
     } finally {

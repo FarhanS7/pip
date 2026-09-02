@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // Mock Electron BrowserWindow
 vi.mock('electron', () => ({
@@ -9,11 +9,12 @@ vi.mock('electron', () => ({
 
 // Mock Screen Capture
 vi.mock('./screen/screen-capture', () => ({
-  captureAllDisplays: vi.fn(async () => [
+  captureAllScreens: vi.fn(async () => [
     {
       displayId: 100,
+      screenIndex: 0,
       bounds: { x: 0, y: 0, width: 1920, height: 1080 },
-      base64Jpeg: 'mock-jpeg-base64-data'
+      jpegBase64: 'mock-jpeg-base64-data'
     }
   ])
 }))
