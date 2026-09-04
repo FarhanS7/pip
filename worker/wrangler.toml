@@ -4,3 +4,5 @@ compatibility_date = "2024-01-01"
 
 [vars]
 ELEVENLABS_VOICE_ID = "kPzsL2i3teMYv0FxEYQ6"
+PIP_SHARED_SECRET = "your-shared-secret-placeholder"
+

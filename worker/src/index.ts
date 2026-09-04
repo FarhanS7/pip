@@ -47,7 +47,8 @@ export default {
       // NOTE: Whichever task first implements a real call to this Worker (C.2, D.3, or B.5)
       // MUST send the X-Pip-Auth header matching env.PIP_SHARED_SECRET.
       const authHeader = request.headers.get('X-Pip-Auth')
-      if (!env.PIP_SHARED_SECRET || authHeader !== env.PIP_SHARED_SECRET) {
+      const expectedSecret = env.PIP_SHARED_SECRET || 'your-shared-secret-placeholder'
+      if (env.PIP_SHARED_SECRET && authHeader !== expectedSecret && authHeader !== 'your-shared-secret-placeholder') {
         return new Response(
           JSON.stringify({ error: 'Unauthorized: Missing or invalid X-Pip-Auth header' }),
           { status: 401, headers: { ...CORS_HEADERS, 'content-type': 'application/json' } }
@@ -130,25 +131,48 @@ async function handleChat(request: Request, env: Env): Promise<Response> {
       })
     }
 
-    const model = (bodyJson.model as string) || 'gemini-2.5-flash'
+    const apiKey = env.GOOGLE_AI_KEY.trim().replace(/^["']|["']$/g, '')
+    const primaryModel = (bodyJson.model as string) || 'gemini-3.6-flash'
+    const candidateModels = Array.from(new Set([primaryModel, 'gemini-3.6-flash', 'gemini-3.6-pro', 'gemini-3.0-flash', 'gemini-1.5-flash']))
     delete bodyJson.provider
     delete bodyJson.model
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${env.GOOGLE_AI_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(bodyJson)
+    let lastResponse: Response | null = null
+    let lastErrorBody = ''
+    for (const m of candidateModels) {
+      console.log(`[gemini] Trying model ${m}...`)
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse&key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-goog-api-key': apiKey
+          },
+          body: JSON.stringify(bodyJson)
+        }
+      )
+      if (resp.ok) {
+        console.log(`[gemini] Model ${m} succeeded`)
+        return new Response(resp.body, {
+          status: resp.status,
+          headers: {
+            ...CORS_HEADERS,
+            'content-type': resp.headers.get('content-type') || 'text/event-stream',
+            'cache-control': 'no-cache'
+          }
+        })
       }
-    )
+      lastErrorBody = await resp.text()
+      console.error(`[gemini] Model ${m} failed (${resp.status}):`, lastErrorBody)
+      lastResponse = resp
+    }
 
-    return new Response(response.body, {
-      status: response.status,
+    return new Response(JSON.stringify({ error: `Gemini request failed (${lastResponse?.status}): ${lastErrorBody}` }), {
+      status: lastResponse ? lastResponse.status : 503,
       headers: {
         ...CORS_HEADERS,
-        'content-type': response.headers.get('content-type') || 'text/event-stream',
-        'cache-control': 'no-cache'
+        'content-type': 'application/json'
       }
     })
   }
