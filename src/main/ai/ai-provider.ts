@@ -1,9 +1,6 @@
-/**
- * AI Vision + Chat Provider Interface & Factory
- *
- * Defines the contract for multi-model vision chat streaming providers.
- * Follows Provider Interface Pattern from PHASE_0_ARCHITECTURE.md §0.4.
- */
+import { ClaudeProvider } from './claude-provider'
+import { OpenAIProvider } from './openai-provider'
+import { GeminiProvider } from './gemini-provider'
 
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system'
@@ -35,19 +32,14 @@ export type AIProviderType = 'claude' | 'openai' | 'gemini'
  */
 export function createAIProvider(type: AIProviderType, _model?: string): AIProvider {
   switch (type) {
-    case 'claude': {
-      const { ClaudeProvider } = require('./claude-provider')
+    case 'claude':
       return new ClaudeProvider()
-    }
-    case 'openai': {
-      const { OpenAIProvider } = require('./openai-provider')
+    case 'openai':
       return new OpenAIProvider()
-    }
-    case 'gemini': {
-      const { GeminiProvider } = require('./gemini-provider')
+    case 'gemini':
       return new GeminiProvider()
-    }
     default:
       throw new Error(`Unsupported AI provider type: ${type}`)
   }
 }
+

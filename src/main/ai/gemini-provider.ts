@@ -19,7 +19,7 @@ const log = createLogger('gemini-provider')
 export class GeminiProvider implements AIProvider {
   public readonly name = 'gemini'
   public readonly displayName = 'Google Gemini'
-  public readonly defaultModel = 'gemini-2.5-flash'
+  public readonly defaultModel = 'gemini-3.6-flash'
 
   private readonly workerUrl: string
   private readonly sharedSecret: string
