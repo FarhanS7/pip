@@ -1,9 +1,6 @@
-/**
- * Text-to-Speech (TTS) Provider Interface & Factory
- *
- * Defines abstract contract for TTS speech synthesis providers.
- * Follows Provider Interface Pattern from PHASE_0_ARCHITECTURE.md §0.4.
- */
+import { ElevenLabsTTSProvider } from './elevenlabs-tts'
+import { OpenAITTSProvider } from './openai-tts'
+import { BrowserTTSProvider } from './browser-tts'
 
 export interface TTSProvider {
   readonly name: string
@@ -22,19 +19,14 @@ export type TTSProviderType = 'elevenlabs' | 'openai-tts' | 'browser'
  */
 export function createTTSProvider(type: TTSProviderType): TTSProvider {
   switch (type) {
-    case 'elevenlabs': {
-      const { ElevenLabsTTSProvider } = require('./elevenlabs-tts')
+    case 'elevenlabs':
       return new ElevenLabsTTSProvider()
-    }
-    case 'openai-tts': {
-      const { OpenAITTSProvider } = require('./openai-tts')
+    case 'openai-tts':
       return new OpenAITTSProvider()
-    }
-    case 'browser': {
-      const { BrowserTTSProvider } = require('./browser-tts')
+    case 'browser':
       return new BrowserTTSProvider()
-    }
     default:
       throw new Error(`Unsupported TTS provider type: ${type}`)
   }
 }
+

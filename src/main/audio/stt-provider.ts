@@ -1,9 +1,5 @@
-/**
- * Speech-to-Text (STT) Provider Interface & Factory
- *
- * Defines the contracts for STT providers and active transcription sessions.
- * Follows Provider Interface Pattern from PHASE_0_ARCHITECTURE.md §0.4.
- */
+import { AssemblyAISTTProvider } from './assemblyai-stt'
+import { WebSpeechSTTProvider } from './web-speech-stt'
 
 export interface STTTranscriptEvent {
   text: string
@@ -38,15 +34,12 @@ export type STTProviderType = 'assemblyai' | 'web-speech'
  */
 export function createSTTProvider(type: STTProviderType): STTProvider {
   switch (type) {
-    case 'assemblyai': {
-      const { AssemblyAISTTProvider } = require('./assemblyai-stt')
+    case 'assemblyai':
       return new AssemblyAISTTProvider()
-    }
-    case 'web-speech': {
-      const { WebSpeechSTTProvider } = require('./web-speech-stt')
+    case 'web-speech':
       return new WebSpeechSTTProvider()
-    }
     default:
       throw new Error(`Unsupported STT provider type: ${type}`)
   }
 }
+
