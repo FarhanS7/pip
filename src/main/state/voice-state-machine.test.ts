@@ -48,6 +48,16 @@ describe('VoiceStateMachine', () => {
     expect(sm.getState()).toBe('idle')
   })
 
+  it('allows barge-in transition from responding directly to listening', () => {
+    sm.transitionTo('listening')
+    sm.transitionTo('processing')
+    sm.transitionTo('responding')
+    expect(sm.getState()).toBe('responding')
+
+    sm.transitionTo('listening', 'user-barge-in')
+    expect(sm.getState()).toBe('listening')
+  })
+
   it('invokes listeners on transition', () => {
     const listener = vi.fn()
     sm.onStateChange(listener)

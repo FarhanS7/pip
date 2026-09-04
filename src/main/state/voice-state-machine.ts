@@ -30,8 +30,8 @@ export class VoiceStateMachine {
   private readonly allowedTransitions: Record<VoiceState, VoiceState[]> = {
     idle: ['listening'],
     listening: ['processing', 'idle'],
-    processing: ['responding', 'idle'],
-    responding: ['idle']
+    processing: ['responding', 'listening', 'idle'],
+    responding: ['listening', 'idle']
   }
 
   /**
