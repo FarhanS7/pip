@@ -89,6 +89,50 @@ function App(): React.JSX.Element {
     }
   }, [])
 
+  useEffect(() => {
+    let recognition: any = null
+
+    if (voiceState === 'listening') {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
+      if (SpeechRecognition) {
+        try {
+          recognition = new SpeechRecognition()
+          recognition.continuous = true
+          recognition.interimResults = true
+          recognition.lang = 'en-US'
+
+          recognition.onresult = (event: any) => {
+            let transcript = ''
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+              transcript += event.results[i][0].transcript
+            }
+            if (transcript.trim() && window.pip) {
+              window.pip.invoke('stt:update_transcript', transcript)
+            }
+          }
+
+          recognition.onerror = (err: any) => {
+            console.warn('[speech-recognition] Error:', err)
+          }
+
+          recognition.start()
+        } catch (err) {
+          console.warn('[speech-recognition] Could not start:', err)
+        }
+      }
+    }
+
+    return () => {
+      if (recognition) {
+        try {
+          recognition.stop()
+        } catch {
+          // ignore
+        }
+      }
+    }
+  }, [voiceState])
+
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>
       {/* Target Element Highlight Box */}

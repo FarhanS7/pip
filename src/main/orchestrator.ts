@@ -32,6 +32,13 @@ export class Orchestrator {
   private activeTtsProvider: TTSProvider | null = null
   private unsubscribeState: (() => void) | null = null
 
+  public setUtterance(text: string): void {
+    if (text && text.trim()) {
+      this.currentUtterance = text.trim()
+      log.info('Orchestrator utterance updated', { text: this.currentUtterance })
+    }
+  }
+
   constructor() {
     log.info('Initializing Central Orchestrator Pipeline')
     this.unsubscribeState = voiceStateMachine.onStateChange((state, reason) => {

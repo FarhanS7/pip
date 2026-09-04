@@ -7,7 +7,7 @@
  * References: PHASE_0_ARCHITECTURE.md §0.1 (Modular Monolith — Electron App)
  */
 
-import { app } from 'electron'
+import { app, session } from 'electron'
 import { createLogger } from './logger'
 import { registerIpcHandlers } from './ipc/handlers'
 import { createSystemTray, destroySystemTray } from './tray'
@@ -38,6 +38,12 @@ if (process.platform === 'darwin') {
 
 app.whenReady().then(() => {
   log.info('App ready', { platform: process.platform, version: app.getVersion() })
+
+  // Auto-approve media/microphone permissions for Electron renderer windows
+  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+    log.debug('Permission requested', { permission })
+    callback(true)
+  })
 
   // Register all IPC handlers for renderer → main communication
   registerIpcHandlers()

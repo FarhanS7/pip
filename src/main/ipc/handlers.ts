@@ -52,6 +52,13 @@ export function registerIpcHandlers(): void {
     return { success: true }
   })
 
+  ipcMain.handle('stt:update_transcript', async (_event, transcript: string) => {
+    const { initOrchestrator } = await import('../orchestrator')
+    const orchestrator = initOrchestrator()
+    orchestrator.setUtterance(transcript)
+    return { success: true }
+  })
+
   // ── App Control ──────────────────────────────────────────────────────
   ipcMain.handle(IpcChannel.APP_QUIT, async () => {
     log.info('Quit requested via IPC')
