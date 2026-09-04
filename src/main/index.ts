@@ -45,8 +45,9 @@ app.whenReady().then(() => {
   // Initialize central orchestrator pipeline
   initOrchestrator()
 
-  // Initialize control panel window
+  // Initialize control panel window and show it on startup
   createPanelWindow()
+  showPanelWindow()
 
   // Initialize system tray icon with left-click toggle
   createSystemTray(() => {

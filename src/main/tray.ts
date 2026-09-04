@@ -119,20 +119,7 @@ export function getTrayBounds(): Electron.Rectangle | null {
  * Used when the actual icon files haven't been added yet.
  */
 function createFallbackIconBuffer(): Buffer {
-  // Minimal 16x16 blue PNG — a single-pixel repeated pattern
-  // This is a valid PNG file that renders as a blue square
-  const width = 16
-  const height = 16
-  const channels = 4 // RGBA
-
-  // Create raw RGBA pixel data: blue with full opacity
-  const pixels = Buffer.alloc(width * height * channels)
-  for (let i = 0; i < width * height; i++) {
-    pixels[i * channels + 0] = 79   // R
-    pixels[i * channels + 1] = 139  // G
-    pixels[i * channels + 2] = 255  // B
-    pixels[i * channels + 3] = 255  // A
-  }
-
-  return pixels
+  const b64 = 'iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAOxAAADsQBlSsOGwAAADhJREFUeJztzLEBADAMwLDO/5/uYQe0h0B25wBwJ11V3W2q2lRVq6qaVFWrqhpVValqVFUtqm6qLw9vXjB6ZgAAAABJRU5ErkJggg=='
+  return Buffer.from(b64, 'base64')
 }
+

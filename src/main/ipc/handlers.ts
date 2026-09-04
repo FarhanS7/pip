@@ -37,6 +37,21 @@ export function registerIpcHandlers(): void {
     return { success: true }
   })
 
+  // ── Recording / Voice State Triggers ──────────────────────────────────
+  ipcMain.handle(IpcChannel.START_RECORDING, async () => {
+    const { voiceStateMachine } = await import('../state/voice-state-machine')
+    log.info('Start recording requested via IPC')
+    voiceStateMachine.transitionTo('listening', 'panel-ui')
+    return { success: true }
+  })
+
+  ipcMain.handle(IpcChannel.STOP_RECORDING, async () => {
+    const { voiceStateMachine } = await import('../state/voice-state-machine')
+    log.info('Stop recording requested via IPC')
+    voiceStateMachine.transitionTo('processing', 'panel-ui')
+    return { success: true }
+  })
+
   // ── App Control ──────────────────────────────────────────────────────
   ipcMain.handle(IpcChannel.APP_QUIT, async () => {
     log.info('Quit requested via IPC')
