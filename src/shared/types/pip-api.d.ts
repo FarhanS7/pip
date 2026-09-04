@@ -35,5 +35,11 @@ export interface PipAPI {
 declare global {
   interface Window {
     pipAPI?: PipAPI
+    pip?: {
+      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
+      on: (channel: string, callback: (...args: any[]) => void) => void
+      off: (channel: string, callback: (...args: any[]) => void) => void
+    }
   }
 }
+

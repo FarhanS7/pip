@@ -66,6 +66,21 @@ function App(): React.JSX.Element {
       setResponseText((prev) => prev + payload.chunk)
     })
 
+    if (window.pip) {
+      window.pip.on('tts:speak', (data: any) => {
+        if ('speechSynthesis' in window && data && data.text) {
+          window.speechSynthesis.cancel()
+          const utterance = new SpeechSynthesisUtterance(data.text)
+          window.speechSynthesis.speak(utterance)
+        }
+      })
+      window.pip.on('tts:stop', () => {
+        if ('speechSynthesis' in window) {
+          window.speechSynthesis.cancel()
+        }
+      })
+    }
+
     return () => {
       unsubVoice()
       unsubPower()
