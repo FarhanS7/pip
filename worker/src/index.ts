@@ -44,11 +44,16 @@ export default {
         })
       }
 
-      // NOTE: Whichever task first implements a real call to this Worker (C.2, D.3, or B.5)
-      // MUST send the X-Pip-Auth header matching env.PIP_SHARED_SECRET.
+      const expectedSecret = env.PIP_SHARED_SECRET
+      if (!expectedSecret?.trim() || expectedSecret.trim() === 'your-shared-secret-placeholder') {
+        return new Response(
+          JSON.stringify({ error: 'Service authentication is not configured' }),
+          { status: 503, headers: { ...CORS_HEADERS, 'content-type': 'application/json' } }
+        )
+      }
+
       const authHeader = request.headers.get('X-Pip-Auth')
-      const expectedSecret = env.PIP_SHARED_SECRET || 'your-shared-secret-placeholder'
-      if (env.PIP_SHARED_SECRET && authHeader !== expectedSecret && authHeader !== 'your-shared-secret-placeholder') {
+      if (!authHeader || !(await credentialsMatch(authHeader, expectedSecret))) {
         return new Response(
           JSON.stringify({ error: 'Unauthorized: Missing or invalid X-Pip-Auth header' }),
           { status: 401, headers: { ...CORS_HEADERS, 'content-type': 'application/json' } }
@@ -77,6 +82,17 @@ export default {
 
     return new Response('Not found', { status: 404, headers: CORS_HEADERS })
   }
+}
+
+async function credentialsMatch(provided: string, expected: string): Promise<boolean> {
+  // Fixed-size digests allow the runtime's timing-safe comparison even when
+  // credential lengths differ. Do not replace this with string equality.
+  const encoder = new TextEncoder()
+  const [providedDigest, expectedDigest] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(provided)),
+    crypto.subtle.digest('SHA-256', encoder.encode(expected))
+  ])
+  return crypto.subtle.timingSafeEqual(providedDigest, expectedDigest)
 }
 
 /**
