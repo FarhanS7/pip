@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-const { mockUIHook, mockSend } = vi.hoisted(() => {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const EventEmitter = require('events').EventEmitter
-  const ee = new EventEmitter()
-  ee.start = vi.fn()
-  ee.stop = vi.fn()
+const { mockUIHook, mockSend } = await vi.hoisted(async () => {
+  const { EventEmitter } = await import('node:events')
+  const ee = Object.assign(new EventEmitter(), { start: vi.fn(), stop: vi.fn() })
   const send = vi.fn()
   return { mockUIHook: ee, mockSend: send }
 })

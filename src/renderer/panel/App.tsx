@@ -15,7 +15,7 @@ import { StatusHeader } from './components/StatusHeader'
 import { VoiceToggleButton } from './components/VoiceToggleButton'
 import { ProviderSelectors } from './components/ProviderSelectors'
 import { HotkeyConfigurator } from './components/HotkeyConfigurator'
-import { SettingsPayload, VoiceStateChangedPayload } from '../../shared/types/ipc'
+import { SettingsPayload } from '../../shared/types/ipc'
 
 const DEFAULT_SETTINGS: SettingsPayload = {
   selectedAIProvider: 'claude',
