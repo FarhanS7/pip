@@ -76,14 +76,14 @@ export function registerIpcHandlers(): void {
   })
 
   ipcMain.handle(IpcChannel.CURSOR_TOGGLE, async (_event, visible: boolean) => {
-    // TODO: A.4 — Toggle overlay window visibility
-    log.debug('Cursor toggle requested', { visible })
+    const { setSetting } = await import('../state/settings')
+    setSetting('cursorEnabled', visible)
     return { success: true }
   })
 
   ipcMain.handle(IpcChannel.CURSOR_VISIBILITY_GET, async () => {
-    // TODO: A.4 — Return current cursor visibility
-    return true
+    const { getSetting } = await import('../state/settings')
+    return getSetting('cursorEnabled')
   })
 
   // ── Permissions ──────────────────────────────────────────────────────

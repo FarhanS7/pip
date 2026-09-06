@@ -59,7 +59,7 @@ function App(): React.JSX.Element {
       await window.pipAPI.setSetting(key, value)
       setSettingsError(null)
     } catch {
-      setSettingsError('Setting was not saved. Check the value and that settings storage is writable.')
+      setSettingsError('Setting was not saved. Check the value, storage access, and shortcut availability. Finish any voice turn before changing the shortcut.')
     }
   }
 

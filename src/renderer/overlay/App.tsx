@@ -16,7 +16,7 @@ import { AudioWaveform } from './components/AudioWaveform'
 import { ProcessingIndicator } from './components/ProcessingIndicator'
 import { SpeechBubble } from './components/SpeechBubble'
 import { BoundingBoxHighlight, BoundingBoxRect } from './components/BoundingBoxHighlight'
-import { subscribeOverlayEvents } from './events'
+import { subscribeOverlayEvents, subscribeCursorVisibility } from './events'
 
 function App(): React.JSX.Element {
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'responding'>('idle')
@@ -28,6 +28,11 @@ function App(): React.JSX.Element {
   const [responseText, setResponseText] = useState<string>('')
   const [targetRect, setTargetRect] = useState<BoundingBoxRect | null>(null)
   const [targetLabel, setTargetLabel] = useState<string>('')
+  const [cursorEnabled, setCursorEnabled] = useState(false)
+
+  useEffect(() => {
+    if (window.pipAPI) return subscribeCursorVisibility(window.pipAPI, setCursorEnabled)
+  }, [])
 
   useEffect(() => {
     if (!window.pipAPI) return
@@ -117,15 +122,15 @@ function App(): React.JSX.Element {
       <BoundingBoxHighlight
         rect={targetRect}
         label={targetLabel}
-        isVisible={voiceState === 'responding' && targetRect !== null}
+        isVisible={cursorEnabled && voiceState === 'responding' && targetRect !== null}
       />
 
       {/* Animated Cursor Companion */}
-      <CursorBuddy
+      {cursorEnabled && <CursorBuddy
         targetX={targetPos.x}
         targetY={targetPos.y}
         voiceState={voiceState}
-      />
+      />}
 
       {/* Auxiliary Overlay Widget Container positioned above Pip */}
       <div

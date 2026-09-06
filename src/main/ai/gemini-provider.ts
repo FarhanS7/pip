@@ -26,7 +26,8 @@ export class GeminiProvider implements AIProvider {
 
   constructor(
     workerUrl: string = process.env.PIP_WORKER_URL || 'http://127.0.0.1:8787',
-    sharedSecret: string = process.env.PIP_SHARED_SECRET || 'your-shared-secret-placeholder'
+    sharedSecret: string = process.env.PIP_SHARED_SECRET || 'your-shared-secret-placeholder',
+    private readonly model: string = ''
   ) {
     this.workerUrl = workerUrl
     this.sharedSecret = sharedSecret
@@ -65,7 +66,7 @@ export class GeminiProvider implements AIProvider {
 
     const requestBody = {
       provider: 'gemini',
-      model: this.defaultModel,
+      model: this.model || this.defaultModel,
       systemInstruction: {
         parts: [{ text: systemPrompt }]
       },

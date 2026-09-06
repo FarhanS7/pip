@@ -25,18 +25,26 @@ export const HotkeyConfigurator: React.FC<HotkeyConfiguratorProps> = ({
       <div className="panel-card-title">Shortcut & Display</div>
 
       {/* Push-to-Talk Hotkey */}
-      <div>
-        <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>
+      <form onSubmit={(event) => {
+        event.preventDefault()
+        onUpdateSetting('pushToTalkHotkey', new FormData(event.currentTarget).get('hotkey'))
+      }}>
+        <label htmlFor="hotkey" style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>
           Push-to-Talk Hotkey
         </label>
         <input
           type="text"
           className="panel-input"
-          value={settings.pushToTalkHotkey}
-          onChange={(e) => onUpdateSetting('pushToTalkHotkey', e.target.value)}
+          id="hotkey"
+          name="hotkey"
+          key={settings.pushToTalkHotkey}
+          defaultValue={settings.pushToTalkHotkey}
+          required
+          maxLength={128}
           placeholder="CommandOrControl+Alt+Space"
         />
-      </div>
+        <button type="submit">Apply shortcut</button>
+      </form>
 
       {/* Cursor Companion Overlay Toggle */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '4px' }}>

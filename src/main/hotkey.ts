@@ -22,6 +22,31 @@ import { createLogger } from './logger'
 const log = createLogger('hotkey')
 
 const DEFAULT_HOTKEY = 'CommandOrControl+Alt+Space'
+let activeHotkey: string | null = null
+
+export interface HotkeyChange { commit(): void; rollback(): void }
+
+/** Reserve the new chord while retaining the old one until settings are saved. */
+export function prepareHotkeyChange(hotkey: string): HotkeyChange {
+  if (hotkey === activeHotkey) return { commit() {}, rollback() {} }
+  if (voiceStateMachine.getState() !== 'idle') throw new Error('Finish the current voice turn before changing shortcuts')
+  const previous = activeHotkey
+  const registered = globalShortcut.register(hotkey, () => {
+    if (activeHotkey === hotkey && !isPushToTalkActive && ['idle', 'responding'].includes(voiceStateMachine.getState())) {
+      isPushToTalkActive = true
+      voiceStateMachine.transitionTo('listening', 'hotkey-press')
+      startReleaseDetection(hotkey)
+    }
+  })
+  if (!registered) throw new Error('Shortcut is unavailable')
+  return {
+    commit() {
+      activeHotkey = hotkey
+      if (previous) globalShortcut.unregister(previous)
+    },
+    rollback() { globalShortcut.unregister(hotkey) }
+  }
+}
 
 /** Tracks whether the push-to-talk key is currently held down */
 let isPushToTalkActive = false
@@ -40,26 +65,8 @@ let safetyNetTimeout: ReturnType<typeof setTimeout> | null = null
  */
 export function registerGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): boolean {
   try {
-    const registered = globalShortcut.register(hotkey, () => {
-      if (!isPushToTalkActive) {
-        isPushToTalkActive = true
-        log.info('Push-to-talk activated', { hotkey })
-
-        // Transition voice state machine to listening
-        voiceStateMachine.transitionTo('listening', 'hotkey-press')
-
-        // Start listening for key release
-        startReleaseDetection(hotkey)
-      }
-    })
-
-    if (registered) {
-      log.info('Global hotkey registered successfully', { hotkey })
-    } else {
-      log.warn('Global hotkey registration returned false — shortcut may be taken', { hotkey })
-    }
-
-    return registered
+    prepareHotkeyChange(hotkey).commit()
+    return true
   } catch (error) {
     log.error('Failed to register global hotkey', {
       hotkey,
@@ -74,6 +81,7 @@ export function registerGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): boolean {
  */
 export function unregisterGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): void {
   globalShortcut.unregister(hotkey)
+  if (activeHotkey === hotkey) activeHotkey = null
   stopReleaseDetection()
   if (isPushToTalkActive) {
     isPushToTalkActive = false
@@ -87,6 +95,7 @@ export function unregisterGlobalHotkey(hotkey: string = DEFAULT_HOTKEY): void {
  */
 export function unregisterAllHotkeys(): void {
   globalShortcut.unregisterAll()
+  activeHotkey = null
   stopReleaseDetection()
   if (isPushToTalkActive) {
     isPushToTalkActive = false

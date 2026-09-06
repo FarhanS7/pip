@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { IpcChannel } from '../ipc/channels'
 import type { SettingsPayload } from '../../shared/types/ipc'
-import { DEFAULT_SETTINGS, normalizeSettings, validateSetting } from '../../shared/settings'
+import { DEFAULT_SETTINGS, PROVIDER_DEFAULT_MODELS, normalizeSettings, validateSetting } from '../../shared/settings'
 import { createLogger } from '../logger'
 
 export { DEFAULT_SETTINGS } from '../../shared/settings'
@@ -15,6 +15,10 @@ let store: Store<Record<string, unknown>> | null = null
 let current: SettingsPayload = { ...DEFAULT_SETTINGS }
 let initialization: Promise<void> | null = null
 let notice: string | null = null
+type SettingsEffect = (next: SettingsPayload) => { commit(): void; rollback(): void }
+let prepareEffect: SettingsEffect | null = null
+export function setSettingsEffect(effect: SettingsEffect): void { prepareEffect = effect }
+export function reportSettingsNotice(message: string): void { notice = message }
 
 /** Initialize once before IPC, windows, or the orchestrator can change settings. */
 export function initSettingsStore(): Promise<void> {
@@ -74,8 +78,15 @@ export function getSetting<K extends keyof SettingsPayload>(key: K): SettingsPay
 function commit(next: SettingsPayload): void {
   if (!store) throw new Error('Settings storage is unavailable; changes were not saved')
   // electron-store commits atomically. Do not publish in-memory state on write failure.
-  store.store = { ...store.store, ...next, schemaVersion: SCHEMA_VERSION }
+  const effect = prepareEffect?.(next)
+  try {
+    store.store = { ...store.store, ...next, schemaVersion: SCHEMA_VERSION }
+  } catch (error) {
+    effect?.rollback()
+    throw error
+  }
   current = next
+  effect?.commit()
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.isDestroyed()) win.webContents.send(IpcChannel.SETTINGS_CHANGED, getSettings())
   }
@@ -83,7 +94,11 @@ function commit(next: SettingsPayload): void {
 
 export function setSetting(key: unknown, value: unknown): void {
   validateSetting(key, value)
-  commit({ ...current, [key]: value })
+  const next = { ...current, [key]: value }
+  if (key === 'selectedAIProvider' && next.selectedAIProvider !== current.selectedAIProvider) {
+    next.selectedAIModel = PROVIDER_DEFAULT_MODELS[next.selectedAIProvider]
+  }
+  commit(next)
 }
 
 export function resetSettingsToDefaults(): void { commit({ ...DEFAULT_SETTINGS }) }

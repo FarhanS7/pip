@@ -26,7 +26,8 @@ export class ClaudeProvider implements AIProvider {
 
   constructor(
     workerUrl: string = process.env.PIP_WORKER_URL || 'http://127.0.0.1:8787',
-    sharedSecret: string = process.env.PIP_SHARED_SECRET || 'your-shared-secret-placeholder'
+    sharedSecret: string = process.env.PIP_SHARED_SECRET || 'your-shared-secret-placeholder',
+    private readonly model: string = ''
   ) {
     this.workerUrl = workerUrl
     this.sharedSecret = sharedSecret
@@ -70,7 +71,7 @@ export class ClaudeProvider implements AIProvider {
     }
 
     const requestBody = {
-      model: this.defaultModel,
+      model: this.model || this.defaultModel,
       max_tokens: 1024,
       system: systemPrompt,
       messages: formattedMessages,

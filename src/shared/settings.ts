@@ -1,8 +1,11 @@
 import type { SettingsPayload } from './types/ipc'
+export const PROVIDER_DEFAULT_MODELS = {
+  claude: 'claude-sonnet-5', openai: 'gpt-4o', gemini: 'gemini-3.6-flash'
+} as const
 
 export const DEFAULT_SETTINGS: Readonly<SettingsPayload> = Object.freeze({
   selectedAIProvider: 'gemini',
-  selectedAIModel: 'gemini-3.6-flash',
+  selectedAIModel: PROVIDER_DEFAULT_MODELS.gemini,
   selectedSTTProvider: 'web-speech',
   selectedTTSProvider: 'browser',
   pushToTalkHotkey: 'CommandOrControl+Alt+Space',
@@ -31,6 +34,10 @@ export function normalizeSettings(raw: Record<string, unknown>): SettingsPayload
   const result = { ...DEFAULT_SETTINGS }
   for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof SettingsPayload)[]) {
     if (validators[key](raw[key])) Object.assign(result, { [key]: raw[key] })
+  }
+  if (!validators.selectedAIModel(raw.selectedAIModel) ||
+    Object.entries(PROVIDER_DEFAULT_MODELS).some(([provider, model]) => provider !== result.selectedAIProvider && model === result.selectedAIModel)) {
+    result.selectedAIModel = PROVIDER_DEFAULT_MODELS[result.selectedAIProvider]
   }
   return result
 }

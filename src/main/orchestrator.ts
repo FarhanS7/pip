@@ -145,9 +145,9 @@ export class Orchestrator {
     }
 
     // 3. Initiate AI Provider streaming
-    const aiType = getSettings().selectedAIProvider
+    const { selectedAIProvider: aiType, selectedAIModel } = getSettings()
     log.info('Instantiating AI Vision provider', { aiType })
-    const aiProvider = createAIProvider(aiType)
+    const aiProvider = createAIProvider(aiType, selectedAIModel)
 
     // Transition state machine to responding
     voiceStateMachine.transitionTo('responding', 'ai-stream-start')

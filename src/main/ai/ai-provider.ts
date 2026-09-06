@@ -30,14 +30,14 @@ export type AIProviderType = 'claude' | 'openai' | 'gemini'
 /**
  * Factory function to instantiate active AI provider.
  */
-export function createAIProvider(type: AIProviderType, _model?: string): AIProvider {
+export function createAIProvider(type: AIProviderType, model?: string): AIProvider {
   switch (type) {
     case 'claude':
-      return new ClaudeProvider()
+      return new ClaudeProvider(undefined, undefined, model)
     case 'openai':
-      return new OpenAIProvider()
+      return new OpenAIProvider(undefined, undefined, model)
     case 'gemini':
-      return new GeminiProvider()
+      return new GeminiProvider(undefined, undefined, model)
     default:
       throw new Error(`Unsupported AI provider type: ${type}`)
   }

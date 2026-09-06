@@ -13,9 +13,9 @@ import { registerIpcHandlers } from './ipc/handlers'
 import { createSystemTray, destroySystemTray } from './tray'
 import { createPanelWindow, togglePanelWindow, showPanelWindow } from './windows/panel-window'
 import { createOverlayWindows, destroyAllOverlayWindows } from './windows/overlay-window'
-import { registerGlobalHotkey, unregisterAllHotkeys } from './hotkey'
+import { registerGlobalHotkey, unregisterAllHotkeys, prepareHotkeyChange } from './hotkey'
 import { initOrchestrator } from './orchestrator'
-import { initSettingsStore } from './state/settings'
+import { initSettingsStore, getSettings, setSettingsEffect, reportSettingsNotice } from './state/settings'
 
 const log = createLogger('shell')
 
@@ -48,6 +48,10 @@ app.whenReady().then(async () => {
 
   // Register all IPC handlers for renderer → main communication
   await initSettingsStore()
+  if (!registerGlobalHotkey(getSettings().pushToTalkHotkey)) {
+    reportSettingsNotice('Saved shortcut is unavailable. Choose another shortcut in Settings; the panel voice button is still available.')
+  }
+  setSettingsEffect(next => prepareHotkeyChange(next.pushToTalkHotkey))
   registerIpcHandlers()
 
   // Initialize central orchestrator pipeline
@@ -65,8 +69,6 @@ app.whenReady().then(async () => {
   // Initialize overlay windows (one per monitor)
   createOverlayWindows()
 
-  // Register global push-to-talk shortcut (CommandOrControl+Alt+Space)
-  registerGlobalHotkey()
 })
 
 app.on('window-all-closed', () => {

@@ -22,3 +22,16 @@ export function subscribeOverlayEvents(api: PipAPI, sink: OverlayEventSink): () 
   ]
   return () => unsubscribe.forEach((stop) => stop())
 }
+
+/** Prefer live changes over a slower initial read, including during renderer mount. */
+export function subscribeCursorVisibility(api: PipAPI, update: (enabled: boolean) => void): () => void {
+  let stale = false
+  const stop = api.onSettingsChanged(settings => {
+    stale = true
+    update(settings.cursorEnabled)
+  })
+  void api.getSettings().then(settings => {
+    if (!stale) update(settings.cursorEnabled)
+  }).catch(() => { /* Keep visuals hidden until a valid settings event arrives. */ })
+  return () => { stale = true; stop() }
+}

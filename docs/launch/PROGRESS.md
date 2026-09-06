@@ -48,3 +48,7 @@ Changes on this implementation branch are not approved for release. Independent 
 ## B09 execution update
 
 B09 settings initialization, validation, versioned migration, backup/recovery and real reset are implemented; checks passed; independent review pending. See the B09 section of REVIEW_CONTEXT.md for evidence and rollback. Startup recovery/storage notices are shown in the panel; unsuccessful writes retain active values. Local lint/typechecks/build pass. The settings suite now has 19 real-storage tests; the prior full suite had 50 passing tests before the last IPC regression was added. Next: B10 live settings application. Native desktop qualification remains open.
+
+## B10 execution update
+
+B10 saved/live shortcuts, cursor visibility and selected model application are implemented; local checks passed; independent review pending. Lint, all typechecks, 62 unit/component-handler tests and production build pass. See REVIEW_CONTEXT.md for behavior, test scope and rollback. No live model call or desktop qualification was performed. Next: B08 IPC sender/permission hardening before B11/B12 turn and media ownership.

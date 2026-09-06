@@ -46,7 +46,7 @@ describe('Settings persistence and recovery', () => {
     const original = JSON.stringify({ cursorEnabled: false, selectedAIProvider: 'openai', selectedTTSProvider: 'invalid', reset: true })
     writeFileSync(path(), original)
     const settings = await load()
-    expect(settings.getSettings()).toEqual({ ...DEFAULT_SETTINGS, cursorEnabled: false, selectedAIProvider: 'openai' })
+    expect(settings.getSettings()).toEqual({ ...DEFAULT_SETTINGS, cursorEnabled: false, selectedAIProvider: 'openai', selectedAIModel: 'gpt-4o' })
     const backup = readdirSync(fixture.directory).find(name => name.includes('.migration-'))!
     expect(readFileSync(join(fixture.directory, backup), 'utf8')).toBe(original)
     expect(JSON.parse(readFileSync(path(), 'utf8'))).not.toHaveProperty('reset')
@@ -114,6 +114,8 @@ describe('Settings persistence and recovery', () => {
     const settings = await load()
     settings.setSetting('cursorEnabled', false)
     fixture.send.mockClear()
+    const effect = { commit: vi.fn(), rollback: vi.fn() }
+    settings.setSettingsEffect(() => effect)
     // Move the fixture file away and replace its directory with a file, forcing ENOTDIR.
     rmSync(fixture.directory, { recursive: true, force: true })
     writeFileSync(fixture.directory, 'blocked')
@@ -121,8 +123,31 @@ describe('Settings persistence and recovery', () => {
       expect(() => settings.resetSettingsToDefaults()).toThrow()
       expect(settings.getSetting('cursorEnabled')).toBe(false)
       expect(fixture.send).not.toHaveBeenCalled()
+      expect(effect.rollback).toHaveBeenCalledOnce()
+      expect(effect.commit).not.toHaveBeenCalled()
     } finally {
       rmSync(fixture.directory, { force: true })
     }
+  })
+
+  it('keeps preferences and disk unchanged when the runtime rejects a shortcut', async () => {
+    const settings = await load()
+    const original = readFileSync(path(), 'utf8')
+    settings.setSettingsEffect(() => { throw new Error('Shortcut unavailable') })
+    expect(() => settings.setSetting('pushToTalkHotkey', 'Alt+X')).toThrow('unavailable')
+    expect(readFileSync(path(), 'utf8')).toBe(original)
+    expect(settings.getSettings()).toEqual(DEFAULT_SETTINGS)
+    expect(fixture.send).not.toHaveBeenCalled()
+  })
+
+  it('changes provider and its default model together while allowing an explicit model', async () => {
+    const settings = await load()
+    settings.setSetting('selectedAIProvider', 'openai')
+    expect(settings.getSetting('selectedAIModel')).toBe('gpt-4o')
+    settings.setSetting('selectedAIModel', 'fixture-custom-model')
+    settings.setSetting('selectedAIProvider', 'openai')
+    expect(settings.getSetting('selectedAIModel')).toBe('fixture-custom-model')
+    settings.setSetting('selectedAIProvider', 'claude')
+    expect(settings.getSetting('selectedAIModel')).toBe('claude-sonnet-5')
   })
 })

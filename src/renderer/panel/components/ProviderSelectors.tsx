@@ -41,6 +41,17 @@ export const ProviderSelectors: React.FC<ProviderSelectorsProps> = ({
       </div>
 
       {/* Speech-to-Text Provider */}
+      <form onSubmit={(event) => {
+        event.preventDefault()
+        onUpdateSetting('selectedAIModel', new FormData(event.currentTarget).get('model'))
+      }}>
+        <label htmlFor="ai-model">AI model ID</label>
+        <input id="ai-model" name="model" className="panel-input"
+          key={`${settings.selectedAIProvider}:${settings.selectedAIModel}`}
+          defaultValue={settings.selectedAIModel} required maxLength={128} />
+        <button type="submit">Apply model</button>
+      </form>
+
       <div>
         <label style={{ fontSize: '12px', color: '#94a3b8', display: 'block', marginBottom: '4px' }}>
           Speech-to-Text (STT)
