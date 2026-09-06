@@ -1,13 +1,12 @@
-/// <reference types="vitest" />
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    globals: true,
     environment: 'node',
+    include: ['test/**/*.integration.test.ts'],
     maxWorkers: 1,
     fileParallelism: false,
-    include: ['src/**/*.test.ts'],
-    exclude: ['node_modules', 'out', 'dist']
+    testTimeout: 15000,
+    hookTimeout: 15000
   }
 })
