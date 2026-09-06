@@ -8,6 +8,20 @@
  */
 
 // ── Voice State ────────────────────────────────────────────────────────
+import { IpcChannel } from '../channels'
+
+/** Main-to-renderer event contracts, shared by senders and the preload bridge. */
+export interface IpcEventPayloads {
+  [IpcChannel.VOICE_STATE_CHANGED]: VoiceStateChangedPayload
+  [IpcChannel.AUDIO_POWER_LEVEL]: AudioPowerLevelPayload
+  [IpcChannel.TRANSCRIPT_UPDATE]: TranscriptUpdatePayload
+  [IpcChannel.AI_RESPONSE_CHUNK]: AIResponseChunkPayload
+  [IpcChannel.AI_RESPONSE_COMPLETE]: AIResponseCompletePayload
+  [IpcChannel.CURSOR_POSITION]: CursorPositionPayload
+  [IpcChannel.ELEMENT_HIGHLIGHT]: ElementHighlightPayload
+  [IpcChannel.OVERLAY_CLEAR]: undefined
+  [IpcChannel.SETTINGS_CHANGED]: SettingsPayload
+}
 
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'responding'
 

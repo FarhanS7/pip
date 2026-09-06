@@ -1,7 +1,34 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { PipAPI } from '../shared/types/pip-api'
+import type { OverlayEventSink } from '../renderer/overlay/events'
+
+const bridge = vi.hoisted(() => {
+  const listeners = new Map<string, Set<(event: unknown, payload: unknown) => void>>()
+  return {
+    exposed: new Map<string, unknown>(),
+    listeners,
+    emit(channel: string, payload: unknown) {
+      listeners.get(channel)?.forEach((listener) => listener({ sender: 'fixture' }, payload))
+    }
+  }
+})
 
 // Mock Electron BrowserWindow
 vi.mock('electron', () => ({
+  contextBridge: {
+    exposeInMainWorld: (name: string, value: unknown) => bridge.exposed.set(name, value)
+  },
+  ipcRenderer: {
+    invoke: vi.fn(),
+    on: (channel: string, listener: (event: unknown, payload: unknown) => void) => {
+      const listeners = bridge.listeners.get(channel) ?? new Set()
+      listeners.add(listener)
+      bridge.listeners.set(channel, listeners)
+    },
+    removeListener: (channel: string, listener: (event: unknown, payload: unknown) => void) => {
+      bridge.listeners.get(channel)?.delete(listener)
+    }
+  },
   BrowserWindow: {
     getAllWindows: vi.fn(() => [])
   }
@@ -63,6 +90,10 @@ vi.mock('./tts/tts-provider', () => ({
 
 import { initOrchestrator, Orchestrator } from './orchestrator'
 import { voiceStateMachine } from './state/voice-state-machine'
+import '../preload/index'
+import { BrowserWindow } from 'electron'
+import { IpcChannel } from '../shared/channels'
+import { subscribeOverlayEvents } from '../renderer/overlay/events'
 
 describe('Central Orchestrator Pipeline', () => {
   beforeEach(() => {
@@ -90,5 +121,57 @@ describe('Central Orchestrator Pipeline', () => {
 
     // State machine automatically transitions through responding to idle
     expect(voiceStateMachine.getState()).toBe('idle')
+  })
+
+  it('delivers streamed text and a parsed point through preload into overlay handlers', async () => {
+    const api = bridge.exposed.get('pipAPI') as PipAPI
+    const sink: OverlayEventSink = {
+      setVoiceState: vi.fn(), resetResponse: vi.fn(), setPowerLevel: vi.fn(),
+      setPoint: vi.fn(), appendText: vi.fn()
+    }
+    const stop = subscribeOverlayEvents(api, sink)
+    const send = vi.fn(bridge.emit)
+    vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([
+      { isDestroyed: () => false, webContents: { send } } as unknown as BrowserWindow
+    ])
+    try {
+      initOrchestrator()
+      voiceStateMachine.transitionTo('listening', 'bridge-test')
+      voiceStateMachine.transitionTo('processing', 'bridge-test')
+      await vi.waitFor(() => expect(sink.setPoint).toHaveBeenCalledWith({
+        x: 100, y: 200, label: 'submit button', screenIndex: 0
+      }))
+      expect(sink.appendText).toHaveBeenNthCalledWith(1, 'Click the submit button. ')
+      expect(sink.appendText).toHaveBeenNthCalledWith(2, '[POINT:100,200:submit button]')
+      expect(sink.resetResponse).toHaveBeenCalledOnce()
+      expect(sink.setVoiceState).toHaveBeenCalledWith('responding')
+      bridge.emit(IpcChannel.AUDIO_POWER_LEVEL, { level: 0.5 })
+      expect(sink.setPowerLevel).toHaveBeenCalledWith(0.5)
+    } finally {
+      stop()
+      vi.mocked(BrowserWindow.getAllWindows).mockReturnValue([])
+    }
+  })
+
+  it('removes exact preload listeners on overlay unmount without affecting another subscriber', () => {
+    const api = bridge.exposed.get('pipAPI') as PipAPI
+    const makeSink = (): OverlayEventSink => ({
+      setVoiceState: vi.fn(), resetResponse: vi.fn(), setPowerLevel: vi.fn(),
+      setPoint: vi.fn(), appendText: vi.fn()
+    })
+    const first = makeSink()
+    const second = makeSink()
+    const stopFirst = subscribeOverlayEvents(api, first)
+    const stopSecond = subscribeOverlayEvents(api, second)
+    stopFirst()
+    stopFirst()
+    bridge.emit(IpcChannel.AI_RESPONSE_CHUNK, { text: 'only second' })
+    bridge.emit(IpcChannel.CURSOR_POSITION, { x: 0, y: -100, label: null, screenIndex: 1 })
+    expect(first.appendText).not.toHaveBeenCalled()
+    expect(first.setPoint).not.toHaveBeenCalled()
+    expect(second.appendText).toHaveBeenCalledExactlyOnceWith('only second')
+    expect(second.setPoint).toHaveBeenCalledExactlyOnceWith({ x: 0, y: -100, label: null, screenIndex: 1 })
+    stopSecond()
+    expect([...bridge.listeners.values()].every((listeners) => listeners.size === 0)).toBe(true)
   })
 })

@@ -22,6 +22,7 @@ The owner authorized implementation on a new branch. The copies of the plan, tas
 | B02 lint and process typechecks | Partially implemented; review pending | Lint and app/Worker/integration types pass. Strict no-DOM audit exposes 16 existing diagnostics; B14/B16 and generated Worker environment types remain |
 | B03 test layers and CI | Initial harness implemented; review pending | 32 unit and 19 local workerd integration tests pass; Windows CI passed on a fresh runner. Desktop driver and full mock audio/AI harness not yet verified |
 | B04 Worker auth bypass | Implemented; checks passed; review pending | Regression suite first failed 5 cases. Fix plus expanded coverage passes 19 tests; invalid requests never reach fixture upstreams; health and valid routes preserved |
+| B07 IPC event contracts | Event delivery fix implemented; checks passed; review pending | Shared channel names and event payload map; typed orchestrator/preload API; overlay reads canonical text/x/y fields. Tests exercise orchestrator → mocked Electron transport → actual preload → overlay handlers and listener cleanup. Real desktop rendering remains unverified; runtime input validation/sender authorization is B08 |
 
 ## Hosted verification
 
@@ -31,14 +32,14 @@ Windows GitHub Actions [run 34045856312](https://github.com/FarhanS7/pip/actions
 
 - `npm run lint`: passed.
 - `npm run typecheck`: passed for app, Worker and integration tests.
-- `npm test`: 10 files / 32 tests passed.
+- `npm test`: 10 files / 34 tests passed after B07 (includes two bridge/overlay regression tests).
 - `npm run test:integration`: 1 file / 19 tests passed in Miniflare/workerd; all upstream requests intercepted.
 - `npm run build`: passed for main, preload, panel and overlay. Existing mixed static/dynamic import warnings remain.
 - `npm run typecheck:boundaries`: 16 known failures, intentionally visible and excluded from baseline CI until audio ownership is repaired.
 - `npm audit`: reports 16 dependency vulnerabilities (1 moderate, 14 high, 1 critical); raw baseline saved in `dependency-audit.json`. No broad automatic/forced upgrade applied. Dependency triage is B32 and remains a release blocker until assessed/remediated.
 - `git diff --check`: passed for current changes.
 
-Next runtime task: B07 canonical IPC contracts, followed by B09/B10 settings and B11/B12 turn/media ownership. Broader B05/B06 Worker validation/environment work remains open. M0/G0 and release qualification are not complete.
+Next runtime tasks: B09/B10 settings, B08 IPC authorization, and B11/B12 turn/media ownership. Broader B05/B06 Worker validation/environment work remains open. M0/G0 and release qualification are not complete.
 
 ## Review and promotion
 

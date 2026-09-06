@@ -1,18 +1,13 @@
 import {
   VoiceStateChangedPayload,
   AudioPowerLevelPayload,
-  SettingsPayload
+  SettingsPayload,
+  CursorPositionPayload,
+  AIResponseChunkPayload
 } from './ipc'
 
-export interface PointDetectedPayload {
-  globalX?: number
-  globalY?: number
-  label?: string
-}
-
-export interface TextChunkPayload {
-  chunk: string
-}
+export type PointDetectedPayload = CursorPositionPayload
+export type TextChunkPayload = AIResponseChunkPayload
 
 export interface PipAPI {
   // Settings

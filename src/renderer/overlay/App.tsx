@@ -16,11 +16,7 @@ import { AudioWaveform } from './components/AudioWaveform'
 import { ProcessingIndicator } from './components/ProcessingIndicator'
 import { SpeechBubble } from './components/SpeechBubble'
 import { BoundingBoxHighlight, BoundingBoxRect } from './components/BoundingBoxHighlight'
-import {
-  VoiceStateChangedPayload,
-  AudioPowerLevelPayload
-} from '../../shared/types/ipc'
-import { PointDetectedPayload, TextChunkPayload } from '../../shared/types/pip-api'
+import { subscribeOverlayEvents } from './events'
 
 function App(): React.JSX.Element {
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'responding'>('idle')
@@ -36,36 +32,21 @@ function App(): React.JSX.Element {
   useEffect(() => {
     if (!window.pipAPI) return
 
-    const unsubVoice = window.pipAPI.onVoiceStateChanged((payload: VoiceStateChangedPayload) => {
-      setVoiceState(payload.state)
-      if (payload.state === 'listening') {
+    const unsubscribe = subscribeOverlayEvents(window.pipAPI, {
+      setVoiceState,
+      resetResponse: () => {
         setResponseText('')
         setTargetRect(null)
-      }
+      },
+      setPowerLevel,
+      setPoint: ({ x, y, label }) => {
+        setTargetPos({ x, y })
+        setTargetLabel(label ?? '')
+        // Display-local conversion and multi-monitor routing are tracked in B18.
+        setTargetRect({ x: x - 40, y: y - 20, width: 80, height: 40 })
+      },
+      appendText: (text) => setResponseText((previous) => previous + text)
     })
-
-    const unsubPower = window.pipAPI.onPowerLevelChanged((payload: AudioPowerLevelPayload) => {
-      setPowerLevel(payload.level)
-    })
-
-    const unsubPoint = window.pipAPI.onPointDetected((payload: PointDetectedPayload) => {
-      if (payload.globalX !== undefined && payload.globalY !== undefined) {
-        setTargetPos({ x: payload.globalX, y: payload.globalY })
-        setTargetLabel(payload.label || '')
-        // Create 80x40 bounding box target rect around point
-        setTargetRect({
-          x: payload.globalX - 40,
-          y: payload.globalY - 20,
-          width: 80,
-          height: 40
-        })
-      }
-    })
-
-    const unsubChunk = window.pipAPI.onTextChunk((payload: TextChunkPayload) => {
-      setResponseText((prev) => prev + payload.chunk)
-    })
-
     if (window.pip) {
       window.pip.on('tts:speak', (data: any) => {
         if ('speechSynthesis' in window && data && data.text) {
@@ -82,10 +63,7 @@ function App(): React.JSX.Element {
     }
 
     return () => {
-      unsubVoice()
-      unsubPower()
-      unsubPoint()
-      unsubChunk()
+      unsubscribe()
     }
   }, [])
 

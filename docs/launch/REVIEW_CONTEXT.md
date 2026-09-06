@@ -35,3 +35,11 @@ Before the auth fix, the initial workerd suite had 5 failed / 11 passed cases. A
 ## Recovery
 
 Tooling changes can be reverted independently. Do not recover authentication by restoring the public placeholder or fail-open behavior. If this auth patch has an operational issue, disable protected paid routes or deliver a corrected secure build. No production deployment or data migration occurred here.
+
+## B07 handoff: IPC event delivery
+
+Main sends `AI_RESPONSE_CHUNK` as `{text}` and `CURSOR_POSITION` as `{x,y,label,screenIndex}`. The overlay previously read different names, resulting in undefined text and ignored points. Shared payload aliases now use the existing main contract; the preload implementation is checked against `PipAPI`, and orchestrator broadcasts are checked against the shared event map. Channel names live in `src/shared/channels.ts`, with a compatibility export at the existing main import path.
+
+The overlay's production event bindings are extracted to `events.ts` and exercised through the actual preload plus orchestrator. Two new tests cover streamed chunks, parsed points, voice/power forwarding, zero/negative coordinates, nullable labels, and exact listener removal with multiple subscribers. Electron transport and AI/audio/screen providers are mocked; no actual desktop or provider call is claimed. Local lint, app/Worker/test types, 34 tests and production build pass. Existing build import warnings persist.
+
+This is compile-time contract alignment, not runtime IPC authorization. B08 still owns raw legacy IPC removal, sender checks and input validation. B18 owns display-local/DPI transformations; B11/B12/B16 own turn lifetime and media rendering. Settings reset behavior is unchanged pending B09. Independent review remains pending. Rollback is a revert of the B07 commit; no stored data or deployed service changes.

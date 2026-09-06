@@ -22,6 +22,7 @@ import { parsePointingCoordinates } from './ai/response-parser'
 import { mapToGlobalScreenCoordinates } from './state/coordinate-mapper'
 import { conversationHistory } from './state/conversation'
 import { IpcChannel } from './ipc/channels'
+import type { IpcEventPayloads } from '../shared/types/ipc'
 import { createLogger } from './logger'
 
 const log = createLogger('orchestrator')
@@ -216,7 +217,7 @@ export class Orchestrator {
     }
   }
 
-  private broadcast(channel: string, payload: unknown): void {
+  private broadcast<C extends keyof IpcEventPayloads>(channel: C, payload: IpcEventPayloads[C]): void {
     const windows = BrowserWindow.getAllWindows()
     for (const win of windows) {
       if (!win.isDestroyed()) {
