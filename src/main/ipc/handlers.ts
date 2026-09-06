@@ -9,6 +9,8 @@
  */
 
 import { ipcMain } from 'electron'
+import type { IpcMainInvokeEvent } from 'electron'
+import { authorizeIpc } from './security'
 import { IpcChannel } from './channels'
 import { createLogger } from '../logger'
 
@@ -22,13 +24,13 @@ export function registerIpcHandlers(): void {
   log.info('Registering IPC handlers')
 
   // ── Settings ─────────────────────────────────────────────────────────
-  ipcMain.handle(IpcChannel.SETTINGS_GET, async () => {
+  handle(IpcChannel.SETTINGS_GET, async () => {
     const { getSettings } = await import('../state/settings')
     log.debug('Settings requested')
     return getSettings()
   })
 
-  ipcMain.handle(IpcChannel.SETTINGS_SET, async (_event, payload: unknown) => {
+  handle(IpcChannel.SETTINGS_SET, async (_event, payload: unknown) => {
     const { setSetting } = await import('../state/settings')
     if (!payload || typeof payload !== 'object' || !('key' in payload) || !('value' in payload)) {
       throw new Error('Invalid settings request')
@@ -36,32 +38,35 @@ export function registerIpcHandlers(): void {
     setSetting(payload.key, payload.value)
   })
 
-  ipcMain.handle(IpcChannel.SETTINGS_RESET, async () => {
+  handle(IpcChannel.SETTINGS_RESET, async () => {
     const { resetSettingsToDefaults } = await import('../state/settings')
     resetSettingsToDefaults()
   })
 
-  ipcMain.handle(IpcChannel.SETTINGS_NOTICE, async () => {
+  handle(IpcChannel.SETTINGS_NOTICE, async () => {
     const { getSettingsNotice } = await import('../state/settings')
     return getSettingsNotice()
   })
 
   // ── Recording / Voice State Triggers ──────────────────────────────────
-  ipcMain.handle(IpcChannel.START_RECORDING, async () => {
+  handle(IpcChannel.START_RECORDING, async () => {
     const { voiceStateMachine } = await import('../state/voice-state-machine')
     log.info('Start recording requested via IPC')
     voiceStateMachine.transitionTo('listening', 'panel-ui')
     return { success: true }
   })
 
-  ipcMain.handle(IpcChannel.STOP_RECORDING, async () => {
+  handle(IpcChannel.STOP_RECORDING, async () => {
     const { voiceStateMachine } = await import('../state/voice-state-machine')
     log.info('Stop recording requested via IPC')
     voiceStateMachine.transitionTo('processing', 'panel-ui')
     return { success: true }
   })
 
-  ipcMain.handle('stt:update_transcript', async (_event, transcript: string) => {
+  handle(IpcChannel.STT_UPDATE_TRANSCRIPT, async (_event, transcript: unknown) => {
+    if (typeof transcript !== 'string' || transcript.length > 16000) throw new Error('Invalid transcript')
+    const { voiceStateMachine } = await import('../state/voice-state-machine')
+    if (voiceStateMachine.getState() !== 'listening') throw new Error('No active recording')
     const { initOrchestrator } = await import('../orchestrator')
     const orchestrator = initOrchestrator()
     orchestrator.setUtterance(transcript)
@@ -69,25 +74,25 @@ export function registerIpcHandlers(): void {
   })
 
   // ── App Control ──────────────────────────────────────────────────────
-  ipcMain.handle(IpcChannel.APP_QUIT, async () => {
+  handle(IpcChannel.APP_QUIT, async () => {
     log.info('Quit requested via IPC')
     const { app } = await import('electron')
     app.quit()
   })
 
-  ipcMain.handle(IpcChannel.CURSOR_TOGGLE, async (_event, visible: boolean) => {
+  handle(IpcChannel.CURSOR_TOGGLE, async (_event, visible: unknown) => {
     const { setSetting } = await import('../state/settings')
     setSetting('cursorEnabled', visible)
     return { success: true }
   })
 
-  ipcMain.handle(IpcChannel.CURSOR_VISIBILITY_GET, async () => {
+  handle(IpcChannel.CURSOR_VISIBILITY_GET, async () => {
     const { getSetting } = await import('../state/settings')
     return getSetting('cursorEnabled')
   })
 
   // ── Permissions ──────────────────────────────────────────────────────
-  ipcMain.handle(IpcChannel.PERMISSIONS_GET, async () => {
+  handle(IpcChannel.PERMISSIONS_GET, async () => {
     // TODO: H.5 — Check actual OS permission statuses
     log.debug('Permission status requested')
     return {
@@ -97,7 +102,8 @@ export function registerIpcHandlers(): void {
     }
   })
 
-  ipcMain.handle(IpcChannel.PERMISSIONS_REQUEST, async (_event, permissionType: string) => {
+  handle(IpcChannel.PERMISSIONS_REQUEST, async (_event, permissionType: unknown) => {
+    if (typeof permissionType !== 'string' || !['microphone', 'accessibility', 'screenCapture'].includes(permissionType)) throw new Error('Invalid permission type')
     // TODO: H.5 — Trigger OS permission dialog
     log.debug('Permission request', { permissionType })
     return { success: false, reason: 'Not yet implemented' }
@@ -105,5 +111,13 @@ export function registerIpcHandlers(): void {
 
   log.info('IPC handlers registered', {
     handlerCount: Object.keys(IpcChannel).length
+  })
+}
+
+function handle(channel: IpcChannel, handler: (event: IpcMainInvokeEvent, payload?: unknown) => Promise<unknown>): void {
+  ipcMain.handle(channel, (event, ...args: unknown[]) => {
+    authorizeIpc(event, channel)
+    if (args.length > 1) throw new Error('Unexpected IPC arguments')
+    return handler(event, args[0])
   })
 }

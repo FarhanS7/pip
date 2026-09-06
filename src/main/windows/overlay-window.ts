@@ -11,6 +11,7 @@
 
 import { BrowserWindow, screen } from 'electron'
 import path from 'path'
+import { rendererURL, secureRenderer } from '../ipc/security'
 import { createLogger } from '../logger'
 
 const log = createLogger('overlay-window')
@@ -89,11 +90,9 @@ function createOverlayForDisplay(display: Electron.Display): BrowserWindow {
   overlayWindow.setAlwaysOnTop(true, 'screen-saver')
 
   // Load the overlay renderer HTML
-  if (process.env.ELECTRON_RENDERER_URL) {
-    overlayWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}/overlay/index.html`)
-  } else {
-    overlayWindow.loadFile(path.join(__dirname, '../renderer/overlay/index.html'))
-  }
+  const url = rendererURL('overlay')
+  secureRenderer(overlayWindow, 'overlay', url)
+  overlayWindow.loadURL(url)
 
   overlayWindow.on('closed', () => {
     overlayWindows.delete(display.id)

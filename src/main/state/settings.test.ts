@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+// Sender policy has its own adversarial suite; these tests isolate storage dispatch.
+vi.mock('../ipc/security', () => ({ authorizeIpc: vi.fn() }))
 
 const fixture = vi.hoisted(() => ({ directory: '', send: vi.fn(), handlers: new Map<string, (event: unknown, payload?: unknown) => Promise<unknown>>() }))
 vi.mock('electron', () => ({

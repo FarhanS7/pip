@@ -10,6 +10,7 @@
 import { app, session } from 'electron'
 import { createLogger } from './logger'
 import { registerIpcHandlers } from './ipc/handlers'
+import { installPermissionPolicy } from './ipc/security'
 import { createSystemTray, destroySystemTray } from './tray'
 import { createPanelWindow, togglePanelWindow, showPanelWindow } from './windows/panel-window'
 import { createOverlayWindows, destroyAllOverlayWindows } from './windows/overlay-window'
@@ -40,11 +41,7 @@ if (process.platform === 'darwin') {
 app.whenReady().then(async () => {
   log.info('App ready', { platform: process.platform, version: app.getVersion() })
 
-  // Auto-approve media/microphone permissions for Electron renderer windows
-  session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    log.debug('Permission requested', { permission })
-    callback(true)
-  })
+  installPermissionPolicy(session.defaultSession)
 
   // Register all IPC handlers for renderer → main communication
   await initSettingsStore()

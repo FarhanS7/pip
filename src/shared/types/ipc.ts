@@ -12,6 +12,8 @@ import { IpcChannel } from '../channels'
 
 /** Main-to-renderer event contracts, shared by senders and the preload bridge. */
 export interface IpcEventPayloads {
+  [IpcChannel.TTS_SPEAK]: { text: string }
+  [IpcChannel.TTS_STOP]: undefined
   [IpcChannel.VOICE_STATE_CHANGED]: VoiceStateChangedPayload
   [IpcChannel.AUDIO_POWER_LEVEL]: AudioPowerLevelPayload
   [IpcChannel.TRANSCRIPT_UPDATE]: TranscriptUpdatePayload

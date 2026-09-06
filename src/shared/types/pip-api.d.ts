@@ -10,6 +10,9 @@ export type PointDetectedPayload = CursorPositionPayload
 export type TextChunkPayload = AIResponseChunkPayload
 
 export interface PipAPI {
+  updateTranscript: (text: string) => Promise<void>
+  onSpeak: (callback: (payload: { text: string }) => void) => () => void
+  onStopSpeaking: (callback: () => void) => () => void
   // Settings
   getSettings: () => Promise<SettingsPayload>
   getSettingsNotice: () => Promise<string | null>
@@ -31,11 +34,6 @@ export interface PipAPI {
 declare global {
   interface Window {
     pipAPI?: PipAPI
-    pip?: {
-      invoke: (channel: string, ...args: unknown[]) => Promise<unknown>
-      on: (channel: string, callback: (...args: any[]) => void) => void
-      off: (channel: string, callback: (...args: any[]) => void) => void
-    }
   }
 }
 

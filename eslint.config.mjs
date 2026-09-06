@@ -13,7 +13,7 @@ export default tseslint.config(
   },
   {
     // Existing untyped bridges are replaced in B07/B09/B15. New files stay strict.
-    files: ['src/shared/types/pip-api.d.ts', 'src/renderer/overlay/App.tsx'],
+    files: ['src/renderer/overlay/App.tsx'],
     rules: { '@typescript-eslint/no-explicit-any': 'off' }
   },
   {

@@ -11,6 +11,7 @@
 
 import { BrowserWindow, screen } from 'electron'
 import path from 'path'
+import { rendererURL, secureRenderer } from '../ipc/security'
 import { createLogger } from '../logger'
 import { getTrayBounds } from '../tray'
 
@@ -45,13 +46,9 @@ export function createPanelWindow(): BrowserWindow {
   })
 
   // Load the panel renderer HTML
-  if (process.env.ELECTRON_RENDERER_URL) {
-    // Dev mode: load from Vite dev server
-    panelWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}/panel/index.html`)
-  } else {
-    // Production: load from built files
-    panelWindow.loadFile(path.join(__dirname, '../renderer/panel/index.html'))
-  }
+  const url = rendererURL('panel')
+  secureRenderer(panelWindow, 'panel', url)
+  panelWindow.loadURL(url)
 
   // Auto-hide when the window loses focus
   panelWindow.on('blur', () => {

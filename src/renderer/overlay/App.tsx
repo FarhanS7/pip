@@ -52,22 +52,23 @@ function App(): React.JSX.Element {
       },
       appendText: (text) => setResponseText((previous) => previous + text)
     })
-    if (window.pip) {
-      window.pip.on('tts:speak', (data: any) => {
+
+    const stopSpeak = window.pipAPI.onSpeak((data) => {
         if ('speechSynthesis' in window && data && data.text) {
           window.speechSynthesis.cancel()
           const utterance = new SpeechSynthesisUtterance(data.text)
           window.speechSynthesis.speak(utterance)
         }
       })
-      window.pip.on('tts:stop', () => {
+    const stopStop = window.pipAPI.onStopSpeaking(() => {
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel()
         }
       })
-    }
 
     return () => {
+      stopSpeak()
+      stopStop()
       unsubscribe()
     }
   }, [])
@@ -89,8 +90,8 @@ function App(): React.JSX.Element {
             for (let i = event.resultIndex; i < event.results.length; i++) {
               transcript += event.results[i][0].transcript
             }
-            if (transcript.trim() && window.pip) {
-              window.pip.invoke('stt:update_transcript', transcript)
+            if (transcript.trim() && window.pipAPI) {
+              void window.pipAPI.updateTranscript(transcript).catch(() => { /* Late or invalid transcripts are refused by main. */ })
             }
           }
 

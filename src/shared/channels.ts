@@ -25,6 +25,9 @@ export enum IpcChannel {
   START_RECORDING = 'audio:start-recording',
   /** Renderer → Main: Stop recording microphone */
   STOP_RECORDING = 'audio:stop-recording',
+  STT_UPDATE_TRANSCRIPT = 'stt:update_transcript',
+  TTS_SPEAK = 'tts:speak',
+  TTS_STOP = 'tts:stop',
   /** Main → Renderer: Audio power level update (for waveform visualizer) */
   AUDIO_POWER_LEVEL = 'audio:power-level',
   /** Main → Renderer: Transcript text update (partial or final) */

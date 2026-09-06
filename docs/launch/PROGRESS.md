@@ -52,3 +52,7 @@ B09 settings initialization, validation, versioned migration, backup/recovery an
 ## B10 execution update
 
 B10 saved/live shortcuts, cursor visibility and selected model application are implemented; local checks passed; independent review pending. Lint, all typechecks, 62 unit/component-handler tests and production build pass. See REVIEW_CONTEXT.md for behavior, test scope and rollback. No live model call or desktop qualification was performed. Next: B08 IPC sender/permission hardening before B11/B12 turn and media ownership.
+
+## B08 execution update
+
+B08 IPC sender/role checks, named preload methods, navigation restrictions, scoped audio permissions and production CSP are implemented; checks passed; independent review pending. Lint/typechecks/build pass; CSP is present in both output HTML files. Real Electron permission/desktop qualification and supported Electron upgrade remain open. Next: B11 turn ownership and cancellation, then B12 single media owner. See REVIEW_CONTEXT.md for test scope and remaining boundaries.

@@ -12,15 +12,6 @@ import { IpcChannel } from '../shared/channels'
 import type { IpcEventPayloads } from '../shared/types/ipc'
 import type { PipAPI } from '../shared/types/pip-api'
 
-// Dev-only Reticle IPC observer hook
-if (process.env.NODE_ENV === 'development') {
-  const rawInvoke = ipcRenderer.invoke.bind(ipcRenderer)
-  ipcRenderer.invoke = (channel: string, ...args: unknown[]) => {
-    console.debug(`[reticle-ipc] ipc://${channel}`, { args })
-    return rawInvoke(channel, ...args)
-  }
-}
-
 function subscribe<C extends keyof IpcEventPayloads>(
   channel: C,
   callback: (payload: IpcEventPayloads[C]) => void
@@ -31,6 +22,9 @@ function subscribe<C extends keyof IpcEventPayloads>(
 }
 
 const pipAPI: PipAPI = {
+  updateTranscript: (text) => ipcRenderer.invoke(IpcChannel.STT_UPDATE_TRANSCRIPT, text),
+  onSpeak: (callback) => subscribe(IpcChannel.TTS_SPEAK, callback),
+  onStopSpeaking: (callback) => subscribe(IpcChannel.TTS_STOP, callback),
   getSettings: () => ipcRenderer.invoke(IpcChannel.SETTINGS_GET),
   getSettingsNotice: () => ipcRenderer.invoke(IpcChannel.SETTINGS_NOTICE),
   setSetting: (key, value) => ipcRenderer.invoke(IpcChannel.SETTINGS_SET, { key, value }),
@@ -44,18 +38,3 @@ const pipAPI: PipAPI = {
   onTextChunk: (callback) => subscribe(IpcChannel.AI_RESPONSE_CHUNK, callback)
 }
 contextBridge.exposeInMainWorld('pipAPI', pipAPI)
-contextBridge.exposeInMainWorld('pip', {
-  invoke: (channel: string, ...args: unknown[]): Promise<unknown> => {
-    return ipcRenderer.invoke(channel, ...args)
-  },
-  on: (channel: string, callback: (...args: unknown[]) => void): void => {
-    const wrappedCallback = (_event: Electron.IpcRendererEvent, ...args: unknown[]): void => {
-      callback(...args)
-    }
-    ipcRenderer.on(channel, wrappedCallback)
-  },
-  off: (channel: string, callback: (...args: unknown[]) => void): void => {
-    ipcRenderer.removeListener(channel, callback as never)
-  }
-})
-

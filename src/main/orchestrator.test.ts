@@ -123,6 +123,19 @@ describe('Central Orchestrator Pipeline', () => {
     expect(voiceStateMachine.getState()).toBe('idle')
   })
 
+  it('exposes named speech methods without a raw invoke/on bridge', () => {
+    expect(bridge.exposed.has('pip')).toBe(false)
+    const api = bridge.exposed.get('pipAPI') as PipAPI
+    expect(api).not.toHaveProperty('invoke')
+    const callback = vi.fn()
+    const stop = api.onSpeak(callback)
+    bridge.emit(IpcChannel.TTS_SPEAK, { text: 'fixture speech' })
+    expect(callback).toHaveBeenCalledExactlyOnceWith({ text: 'fixture speech' })
+    stop()
+    bridge.emit(IpcChannel.TTS_SPEAK, { text: 'after unmount' })
+    expect(callback).toHaveBeenCalledOnce()
+  })
+
   it('delivers streamed text and a parsed point through preload into overlay handlers', async () => {
     const api = bridge.exposed.get('pipAPI') as PipAPI
     const sink: OverlayEventSink = {
