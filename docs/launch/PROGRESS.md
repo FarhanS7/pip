@@ -20,8 +20,12 @@ The owner authorized implementation on a new branch. The copies of the plan, tas
 | --- | --- | --- |
 | B01 baseline and versioned plan | Implemented; review pending | Branch created on GitHub; plan and analysis copied with portable links; baseline recorded here; real hardware baseline pending |
 | B02 lint and process typechecks | Partially implemented; review pending | Lint and app/Worker/integration types pass. Strict no-DOM audit exposes 16 existing diagnostics; B14/B16 and generated Worker environment types remain |
-| B03 test layers and CI | Initial harness implemented; review pending | 32 unit and 19 local workerd integration tests pass; Windows CI configured. Hosted CI, desktop driver and full mock audio/AI harness not yet verified |
+| B03 test layers and CI | Initial harness implemented; review pending | 32 unit and 19 local workerd integration tests pass; Windows CI passed on a fresh runner. Desktop driver and full mock audio/AI harness not yet verified |
 | B04 Worker auth bypass | Implemented; checks passed; review pending | Regression suite first failed 5 cases. Fix plus expanded coverage passes 19 tests; invalid requests never reach fixture upstreams; health and valid routes preserved |
+
+## Hosted verification
+
+Windows GitHub Actions [run 34045856312](https://github.com/FarhanS7/pip/actions/runs/34045856312) passed all checks for commit `fd15aa0b58352da04bccd1fe4c312282c03f7e66`: clean dependency installs, lint, typechecks, unit tests, Worker integration tests and production build. This is development verification; independent review and packaged desktop qualification remain pending.
 
 ## Latest local evidence
 
