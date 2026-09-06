@@ -32,8 +32,9 @@ function subscribe<C extends keyof IpcEventPayloads>(
 
 const pipAPI: PipAPI = {
   getSettings: () => ipcRenderer.invoke(IpcChannel.SETTINGS_GET),
+  getSettingsNotice: () => ipcRenderer.invoke(IpcChannel.SETTINGS_NOTICE),
   setSetting: (key, value) => ipcRenderer.invoke(IpcChannel.SETTINGS_SET, { key, value }),
-  resetSettings: () => ipcRenderer.invoke(IpcChannel.SETTINGS_SET, { key: 'reset', value: true }),
+  resetSettings: () => ipcRenderer.invoke(IpcChannel.SETTINGS_RESET),
   onSettingsChanged: (callback) => subscribe(IpcChannel.SETTINGS_CHANGED, callback),
   onVoiceStateChanged: (callback) => subscribe(IpcChannel.VOICE_STATE_CHANGED, callback),
   triggerPushToTalkPress: () => ipcRenderer.invoke(IpcChannel.START_RECORDING),

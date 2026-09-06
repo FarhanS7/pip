@@ -47,6 +47,8 @@ export enum IpcChannel {
   // ── Settings ─────────────────────────────────────────────────────────
   /** Renderer → Main: Get all settings */
   SETTINGS_GET = 'settings:get',
+  SETTINGS_RESET = 'settings:reset',
+  SETTINGS_NOTICE = 'settings:notice',
   /** Renderer → Main: Update a setting */
   SETTINGS_SET = 'settings:set',
   /** Main → Renderer: Settings changed (broadcast) */

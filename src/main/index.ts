@@ -15,6 +15,7 @@ import { createPanelWindow, togglePanelWindow, showPanelWindow } from './windows
 import { createOverlayWindows, destroyAllOverlayWindows } from './windows/overlay-window'
 import { registerGlobalHotkey, unregisterAllHotkeys } from './hotkey'
 import { initOrchestrator } from './orchestrator'
+import { initSettingsStore } from './state/settings'
 
 const log = createLogger('shell')
 
@@ -36,7 +37,7 @@ if (process.platform === 'darwin') {
 
 // ── App Lifecycle ────────────────────────────────────────────────────────
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   log.info('App ready', { platform: process.platform, version: app.getVersion() })
 
   // Auto-approve media/microphone permissions for Electron renderer windows
@@ -46,6 +47,7 @@ app.whenReady().then(() => {
   })
 
   // Register all IPC handlers for renderer → main communication
+  await initSettingsStore()
   registerIpcHandlers()
 
   // Initialize central orchestrator pipeline

@@ -44,3 +44,7 @@ Next runtime tasks: B09/B10 settings, B08 IPC authorization, and B11/B12 turn/me
 ## Review and promotion
 
 Changes on this implementation branch are not approved for release. Independent review is still required by CONTRIBUTING.md. Its named reviewer is not an available model in this session; no independent review is claimed. No merge to dev/main, production Worker deployment, paid-provider request or desktop release is part of this baseline batch.
+
+## B09 execution update
+
+B09 settings initialization, validation, versioned migration, backup/recovery and real reset are implemented; checks passed; independent review pending. See the B09 section of REVIEW_CONTEXT.md for evidence and rollback. Startup recovery/storage notices are shown in the panel; unsuccessful writes retain active values. Local lint/typechecks/build pass. The settings suite now has 19 real-storage tests; the prior full suite had 50 passing tests before the last IPC regression was added. Next: B10 live settings application. Native desktop qualification remains open.

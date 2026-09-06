@@ -17,18 +17,12 @@ import { ProviderSelectors } from './components/ProviderSelectors'
 import { HotkeyConfigurator } from './components/HotkeyConfigurator'
 import { SettingsPayload } from '../../shared/types/ipc'
 
-const DEFAULT_SETTINGS: SettingsPayload = {
-  selectedAIProvider: 'claude',
-  selectedAIModel: 'claude-sonnet-5',
-  selectedSTTProvider: 'assemblyai',
-  selectedTTSProvider: 'elevenlabs',
-  pushToTalkHotkey: 'CommandOrControl+Alt+Space',
-  cursorEnabled: true
-}
+import { DEFAULT_SETTINGS } from '../../shared/settings'
 
 function App(): React.JSX.Element {
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'responding'>('idle')
   const [settings, setSettings] = useState<SettingsPayload>(DEFAULT_SETTINGS)
+  const [settingsError, setSettingsError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!window.pipAPI) return
@@ -39,7 +33,10 @@ function App(): React.JSX.Element {
         setSettings(loadedSettings)
       }
     }).catch(() => {
-      // Fall back to defaults if uninitialized
+      setSettingsError('Could not load settings. Please restart Pip.')
+    })
+    window.pipAPI.getSettingsNotice().then(setSettingsError).catch(() => {
+      setSettingsError('Could not check settings storage. Please restart Pip.')
     })
 
     const unsubVoice = window.pipAPI.onVoiceStateChanged((payload) => {
@@ -56,10 +53,23 @@ function App(): React.JSX.Element {
     }
   }, [])
 
-  const handleUpdateSetting = (key: keyof SettingsPayload, value: unknown) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
-    if (window.pipAPI) {
-      window.pipAPI.setSetting(key, value)
+  const handleUpdateSetting = async (key: keyof SettingsPayload, value: unknown) => {
+    if (!window.pipAPI) return
+    try {
+      await window.pipAPI.setSetting(key, value)
+      setSettingsError(null)
+    } catch {
+      setSettingsError('Setting was not saved. Check the value and that settings storage is writable.')
+    }
+  }
+
+  const handleResetSettings = async () => {
+    if (!window.pipAPI) return
+    try {
+      await window.pipAPI.resetSettings()
+      setSettingsError(null)
+    } catch {
+      setSettingsError('Settings could not be reset. Existing preferences were kept.')
     }
   }
 
@@ -74,6 +84,7 @@ function App(): React.JSX.Element {
 
   return (
     <div className="panel-container">
+      {settingsError && <p role="alert">{settingsError}</p>}
       {/* Real-Time Status Header */}
       <StatusHeader voiceState={voiceState} />
 
@@ -85,6 +96,7 @@ function App(): React.JSX.Element {
 
       {/* Shortcut & Overlay Configuration */}
       <HotkeyConfigurator settings={settings} onUpdateSetting={handleUpdateSetting} />
+      <button type="button" onClick={handleResetSettings}>Reset settings to defaults</button>
     </div>
   )
 }

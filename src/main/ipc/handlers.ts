@@ -28,13 +28,22 @@ export function registerIpcHandlers(): void {
     return getSettings()
   })
 
-  ipcMain.handle(IpcChannel.SETTINGS_SET, async (_event, payload: { key: string; value: unknown }) => {
+  ipcMain.handle(IpcChannel.SETTINGS_SET, async (_event, payload: unknown) => {
     const { setSetting } = await import('../state/settings')
-    log.debug('Setting update requested', { payload })
-    if (payload && payload.key) {
-      setSetting(payload.key as never, payload.value as never)
+    if (!payload || typeof payload !== 'object' || !('key' in payload) || !('value' in payload)) {
+      throw new Error('Invalid settings request')
     }
-    return { success: true }
+    setSetting(payload.key, payload.value)
+  })
+
+  ipcMain.handle(IpcChannel.SETTINGS_RESET, async () => {
+    const { resetSettingsToDefaults } = await import('../state/settings')
+    resetSettingsToDefaults()
+  })
+
+  ipcMain.handle(IpcChannel.SETTINGS_NOTICE, async () => {
+    const { getSettingsNotice } = await import('../state/settings')
+    return getSettingsNotice()
   })
 
   // ── Recording / Voice State Triggers ──────────────────────────────────

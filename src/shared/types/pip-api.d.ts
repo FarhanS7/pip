@@ -12,6 +12,7 @@ export type TextChunkPayload = AIResponseChunkPayload
 export interface PipAPI {
   // Settings
   getSettings: () => Promise<SettingsPayload>
+  getSettingsNotice: () => Promise<string | null>
   setSetting: (key: keyof SettingsPayload, value: unknown) => Promise<void>
   resetSettings: () => Promise<void>
   onSettingsChanged: (callback: (payload: SettingsPayload) => void) => () => void

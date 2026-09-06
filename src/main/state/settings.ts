@@ -1,109 +1,89 @@
-/**
- * Settings Manager
- *
- * Persists user configuration using `electron-store`.
- * Provides type-safe accessors, defaults, and emits IPC change broadcasts.
- *
- * References:
- *   PHASE_0_ARCHITECTURE.md §0.3 (electron-store JSON configuration)
- *   PHASE_1_MODULES_AND_TASKS.md Task F.3 scoped checklist
- */
-
-import { BrowserWindow } from 'electron'
+import { app, BrowserWindow } from 'electron'
+import type Store from 'electron-store'
+import { readFileSync, copyFileSync, renameSync, constants } from 'node:fs'
+import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { IpcChannel } from '../ipc/channels'
-import { SettingsPayload } from '../../shared/types/ipc'
+import type { SettingsPayload } from '../../shared/types/ipc'
+import { DEFAULT_SETTINGS, normalizeSettings, validateSetting } from '../../shared/settings'
 import { createLogger } from '../logger'
 
+export { DEFAULT_SETTINGS } from '../../shared/settings'
 const log = createLogger('settings')
+const SCHEMA_VERSION = 1
+let store: Store<Record<string, unknown>> | null = null
+let current: SettingsPayload = { ...DEFAULT_SETTINGS }
+let initialization: Promise<void> | null = null
+let notice: string | null = null
 
-export const DEFAULT_SETTINGS: SettingsPayload = {
-  selectedAIProvider: 'gemini',
-  selectedAIModel: 'gemini-3.6-flash',
-  selectedSTTProvider: 'web-speech',
-  selectedTTSProvider: 'browser',
-  pushToTalkHotkey: 'CommandOrControl+Alt+Space',
-  cursorEnabled: true
+/** Initialize once before IPC, windows, or the orchestrator can change settings. */
+export function initSettingsStore(): Promise<void> {
+  initialization ??= loadSettings()
+  return initialization
 }
 
-let store: any = null
-let inMemoryStore: SettingsPayload = { ...DEFAULT_SETTINGS }
-
-/**
- * Initialize the settings store asynchronously to support pure ESM electron-store in Electron CJS main process.
- */
-export async function initSettingsStore(): Promise<any> {
-  if (!store) {
+async function loadSettings(): Promise<void> {
+  try {
+    const path = join(app.getPath('userData'), 'pip-settings.json')
+    let raw: Record<string, unknown> = {}
+    let contents: string | undefined
     try {
-      const { default: Store } = await import('electron-store')
-      store = new Store<SettingsPayload>({
-        name: 'pip-settings',
-        defaults: DEFAULT_SETTINGS
-      })
-      for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof SettingsPayload)[]) {
-        (inMemoryStore as any)[key] = store.get(key, DEFAULT_SETTINGS[key])
+      contents = readFileSync(path, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error
+    }
+    if (contents !== undefined) {
+      try {
+        const parsed: unknown = JSON.parse(contents)
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new SyntaxError('Invalid settings document')
+        raw = parsed as Record<string, unknown>
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) throw error
+        // Preserve the exact corrupt file before creating a clean store.
+        renameSync(path, `${path}.corrupt-${randomUUID()}.bak`)
+        notice = 'Invalid settings were backed up. Defaults have been restored.'
+        contents = undefined
       }
-      log.info('Settings store initialized', { path: store.path })
-    } catch (err) {
-      log.warn('Could not load electron-store ESM, using in-memory store', { error: String(err) })
     }
-  }
-  return store
-}
-
-/**
- * Get all current settings.
- */
-export function getSettings(): SettingsPayload {
-  if (store) {
-    return {
-      selectedAIProvider: store.get('selectedAIProvider', inMemoryStore.selectedAIProvider),
-      selectedAIModel: store.get('selectedAIModel', inMemoryStore.selectedAIModel),
-      selectedSTTProvider: store.get('selectedSTTProvider', inMemoryStore.selectedSTTProvider),
-      selectedTTSProvider: store.get('selectedTTSProvider', inMemoryStore.selectedTTSProvider),
-      pushToTalkHotkey: store.get('pushToTalkHotkey', inMemoryStore.pushToTalkHotkey),
-      cursorEnabled: store.get('cursorEnabled', inMemoryStore.cursorEnabled)
+    if (raw.schemaVersion !== undefined && raw.schemaVersion !== SCHEMA_VERSION) {
+      throw new Error('Unsupported settings version')
     }
-  }
-  return { ...inMemoryStore }
-}
-
-/**
- * Get a specific setting by key.
- */
-export function getSetting<K extends keyof SettingsPayload>(key: K): SettingsPayload[K] {
-  if (store) {
-    return store.get(key, inMemoryStore[key])
-  }
-  return inMemoryStore[key]
-}
-
-/**
- * Update a specific setting by key and broadcast the change via IPC.
- */
-export function setSetting<K extends keyof SettingsPayload>(key: K, value: SettingsPayload[K]): void {
-  inMemoryStore[key] = value
-  if (store) {
-    store.set(key, value)
-  }
-  log.info('Setting updated', { key, value })
-
-  const updatedSettings = getSettings()
-  const windows = BrowserWindow.getAllWindows()
-  for (const win of windows) {
-    if (!win.isDestroyed()) {
-      win.webContents.send(IpcChannel.SETTINGS_CHANGED, updatedSettings)
+    const normalized = normalizeSettings(raw)
+    const document = { ...normalized, schemaVersion: SCHEMA_VERSION, ...(raw.__internal__ === undefined ? {} : { __internal__: raw.__internal__ }) }
+    const changed = raw.schemaVersion !== SCHEMA_VERSION ||
+      Object.entries(normalized).some(([key, value]) => raw[key] !== value) ||
+      Object.keys(raw).some(key => key !== 'schemaVersion' && key !== '__internal__' && !Object.hasOwn(normalized, key))
+    if (contents !== undefined && changed) {
+      copyFileSync(path, `${path}.migration-${randomUUID()}.bak`, constants.COPYFILE_EXCL)
     }
+    const { default: ElectronStore } = await import('electron-store')
+    const candidate = new ElectronStore<Record<string, unknown>>({ name: 'pip-settings', cwd: app.getPath('userData'), clearInvalidConfig: false })
+    if (changed) candidate.store = document
+    store = candidate
+    current = normalized
+  } catch (error) {
+    notice = 'Settings could not be loaded. Using defaults; changes cannot be saved. Your existing file is preserved. Restart after resolving the storage problem.'
+    log.warn('Settings storage unavailable', { error: String(error) })
   }
 }
 
-/**
- * Reset all settings to defaults.
- */
-export function resetSettingsToDefaults(): void {
-  inMemoryStore = { ...DEFAULT_SETTINGS }
-  if (store) {
-    store.store = { ...DEFAULT_SETTINGS }
+export function getSettings(): SettingsPayload { return { ...current } }
+export function getSettingsNotice(): string | null { return notice }
+export function getSetting<K extends keyof SettingsPayload>(key: K): SettingsPayload[K] { return current[key] }
+
+function commit(next: SettingsPayload): void {
+  if (!store) throw new Error('Settings storage is unavailable; changes were not saved')
+  // electron-store commits atomically. Do not publish in-memory state on write failure.
+  store.store = { ...store.store, ...next, schemaVersion: SCHEMA_VERSION }
+  current = next
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (!win.isDestroyed()) win.webContents.send(IpcChannel.SETTINGS_CHANGED, getSettings())
   }
-  log.info('Settings reset to defaults')
 }
 
+export function setSetting(key: unknown, value: unknown): void {
+  validateSetting(key, value)
+  commit({ ...current, [key]: value })
+}
+
+export function resetSettingsToDefaults(): void { commit({ ...DEFAULT_SETTINGS }) }
