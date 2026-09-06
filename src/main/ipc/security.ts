@@ -51,6 +51,7 @@ function trustedRole(contents: WebContents | null): RendererRole | null {
 
 const readChannels = new Set<string>([IpcChannel.SETTINGS_GET])
 const panelChannels = new Set<string>([
+  IpcChannel.CANCEL_TURN,
   IpcChannel.SETTINGS_SET, IpcChannel.SETTINGS_RESET, IpcChannel.SETTINGS_NOTICE,
   IpcChannel.START_RECORDING, IpcChannel.STOP_RECORDING, IpcChannel.APP_QUIT,
   IpcChannel.CURSOR_TOGGLE, IpcChannel.CURSOR_VISIBILITY_GET,

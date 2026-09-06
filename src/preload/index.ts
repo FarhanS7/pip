@@ -22,7 +22,7 @@ function subscribe<C extends keyof IpcEventPayloads>(
 }
 
 const pipAPI: PipAPI = {
-  updateTranscript: (text) => ipcRenderer.invoke(IpcChannel.STT_UPDATE_TRANSCRIPT, text),
+  updateTranscript: (text, turnId) => ipcRenderer.invoke(IpcChannel.STT_UPDATE_TRANSCRIPT, { text, turnId }),
   onSpeak: (callback) => subscribe(IpcChannel.TTS_SPEAK, callback),
   onStopSpeaking: (callback) => subscribe(IpcChannel.TTS_STOP, callback),
   getSettings: () => ipcRenderer.invoke(IpcChannel.SETTINGS_GET),
@@ -33,6 +33,7 @@ const pipAPI: PipAPI = {
   onVoiceStateChanged: (callback) => subscribe(IpcChannel.VOICE_STATE_CHANGED, callback),
   triggerPushToTalkPress: () => ipcRenderer.invoke(IpcChannel.START_RECORDING),
   triggerPushToTalkRelease: () => ipcRenderer.invoke(IpcChannel.STOP_RECORDING),
+  cancelTurn: () => ipcRenderer.invoke(IpcChannel.CANCEL_TURN),
   onPowerLevelChanged: (callback) => subscribe(IpcChannel.AUDIO_POWER_LEVEL, callback),
   onPointDetected: (callback) => subscribe(IpcChannel.CURSOR_POSITION, callback),
   onTextChunk: (callback) => subscribe(IpcChannel.AI_RESPONSE_CHUNK, callback)

@@ -21,6 +21,8 @@ export type VoiceStateListener = (state: VoiceState, reason?: string) => void
 
 export class VoiceStateMachine {
   private currentState: VoiceState = 'idle'
+  private turnId = 0
+  public getTurnId(): number { return this.turnId }
   private listeners: Set<VoiceStateListener> = new Set()
 
   /**
@@ -68,6 +70,7 @@ export class VoiceStateMachine {
 
     const previousState = this.currentState
     this.currentState = nextState
+    if (nextState === 'listening') this.turnId++
 
     log.info('Voice state changed', { from: previousState, to: nextState, reason })
 
@@ -90,6 +93,9 @@ export class VoiceStateMachine {
   public reset(reason: string = 'force-reset'): void {
     this.currentState = 'idle'
     log.info('Voice state reset to idle', { reason })
+    for (const listener of this.listeners) {
+      try { listener('idle', reason) } catch (error) { log.error('Reset listener failed', { error: String(error) }) }
+    }
     this.broadcastStateChange('idle', reason)
   }
 
@@ -107,7 +113,7 @@ export class VoiceStateMachine {
    * Broadcast state update via IPC to all open BrowserWindows.
    */
   private broadcastStateChange(state: VoiceState, reason?: string): void {
-    const payload: VoiceStateChangedPayload = { state, reason }
+    const payload: VoiceStateChangedPayload = { state, reason, turnId: this.turnId }
     const windows = BrowserWindow.getAllWindows()
 
     for (const win of windows) {

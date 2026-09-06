@@ -15,7 +15,7 @@ import { createSystemTray, destroySystemTray } from './tray'
 import { createPanelWindow, togglePanelWindow, showPanelWindow } from './windows/panel-window'
 import { createOverlayWindows, destroyAllOverlayWindows } from './windows/overlay-window'
 import { registerGlobalHotkey, unregisterAllHotkeys, prepareHotkeyChange } from './hotkey'
-import { initOrchestrator } from './orchestrator'
+import { initOrchestrator, destroyOrchestrator } from './orchestrator'
 import { initSettingsStore, getSettings, setSettingsEffect, reportSettingsNotice } from './state/settings'
 
 const log = createLogger('shell')
@@ -77,6 +77,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   log.info('App shutting down — cleaning up resources')
   unregisterAllHotkeys()
+  destroyOrchestrator()
   destroyAllOverlayWindows()
   destroySystemTray()
 })

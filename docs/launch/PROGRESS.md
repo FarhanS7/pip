@@ -56,3 +56,9 @@ B10 saved/live shortcuts, cursor visibility and selected model application are i
 ## B08 execution update
 
 B08 IPC sender/role checks, named preload methods, navigation restrictions, scoped audio permissions and production CSP are implemented; checks passed; independent review pending. Lint/typechecks/build pass; CSP is present in both output HTML files. Real Electron permission/desktop qualification and supported Electron upgrade remain open. Next: B11 turn ownership and cancellation, then B12 single media owner. See REVIEW_CONTEXT.md for test scope and remaining boundaries.
+
+## B11 execution update
+
+B11 turn-owned state, cancellation IPC, reset/shutdown cleanup, transcript/key-release turn IDs and AI/TTS abort-signal forwarding are implemented; local checks passed; independent review pending. Delayed canceled work cannot publish into a newer turn in the regression suite. Provider startup and actual playback completion remain limited by existing media adapters. Next: B12 single media renderer and acknowledgement handshake, then B13/B14/B16 provider transport.
+
+B11 final verification: 14 test files / 79 tests passed; lint, app/Worker/test typechecks and production build passed. Existing mixed-import build warnings remain.

@@ -23,6 +23,7 @@ const log = createLogger('hotkey')
 
 const DEFAULT_HOTKEY = 'CommandOrControl+Alt+Space'
 let activeHotkey: string | null = null
+let pressedTurnId = 0
 
 export interface HotkeyChange { commit(): void; rollback(): void }
 
@@ -35,6 +36,7 @@ export function prepareHotkeyChange(hotkey: string): HotkeyChange {
     if (activeHotkey === hotkey && !isPushToTalkActive && ['idle', 'responding'].includes(voiceStateMachine.getState())) {
       isPushToTalkActive = true
       voiceStateMachine.transitionTo('listening', 'hotkey-press')
+      pressedTurnId = voiceStateMachine.getTurnId()
       startReleaseDetection(hotkey)
     }
   })
@@ -156,7 +158,9 @@ function handleKeyRelease(): void {
   log.info('Push-to-talk deactivated')
 
   // Transition voice state machine to processing
-  voiceStateMachine.transitionTo('processing', 'hotkey-release')
+  if (voiceStateMachine.getState() === 'listening' && voiceStateMachine.getTurnId() === pressedTurnId) {
+    voiceStateMachine.transitionTo('processing', 'hotkey-release')
+  }
 }
 
 /**

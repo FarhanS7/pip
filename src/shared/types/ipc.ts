@@ -28,6 +28,7 @@ export interface IpcEventPayloads {
 export type VoiceState = 'idle' | 'listening' | 'processing' | 'responding'
 
 export interface VoiceStateChangedPayload {
+  turnId?: number
   state: VoiceState
   /** Optional message describing why the state changed */
   reason?: string

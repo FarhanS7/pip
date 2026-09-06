@@ -10,7 +10,7 @@ export type PointDetectedPayload = CursorPositionPayload
 export type TextChunkPayload = AIResponseChunkPayload
 
 export interface PipAPI {
-  updateTranscript: (text: string) => Promise<void>
+  updateTranscript: (text: string, turnId: number) => Promise<void>
   onSpeak: (callback: (payload: { text: string }) => void) => () => void
   onStopSpeaking: (callback: () => void) => () => void
   // Settings
@@ -24,6 +24,7 @@ export interface PipAPI {
   onVoiceStateChanged: (callback: (payload: VoiceStateChangedPayload) => void) => () => void
   triggerPushToTalkPress: () => void
   triggerPushToTalkRelease: () => void
+  cancelTurn: () => Promise<void>
 
   // Audio / AI Events
   onPowerLevelChanged: (callback: (payload: AudioPowerLevelPayload) => void) => () => void

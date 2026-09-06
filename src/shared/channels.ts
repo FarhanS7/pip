@@ -25,6 +25,7 @@ export enum IpcChannel {
   START_RECORDING = 'audio:start-recording',
   /** Renderer → Main: Stop recording microphone */
   STOP_RECORDING = 'audio:stop-recording',
+  CANCEL_TURN = 'audio:cancel-turn',
   STT_UPDATE_TRANSCRIPT = 'stt:update_transcript',
   TTS_SPEAK = 'tts:speak',
   TTS_STOP = 'tts:stop',

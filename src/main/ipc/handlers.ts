@@ -22,6 +22,10 @@ const log = createLogger('ipc')
  */
 export function registerIpcHandlers(): void {
   log.info('Registering IPC handlers')
+  handle(IpcChannel.CANCEL_TURN, async () => {
+    const { initOrchestrator } = await import('../orchestrator')
+    initOrchestrator().cancel()
+  })
 
   // ── Settings ─────────────────────────────────────────────────────────
   handle(IpcChannel.SETTINGS_GET, async () => {
@@ -59,17 +63,19 @@ export function registerIpcHandlers(): void {
   handle(IpcChannel.STOP_RECORDING, async () => {
     const { voiceStateMachine } = await import('../state/voice-state-machine')
     log.info('Stop recording requested via IPC')
-    voiceStateMachine.transitionTo('processing', 'panel-ui')
+    if (voiceStateMachine.getState() === 'listening') voiceStateMachine.transitionTo('processing', 'panel-ui')
     return { success: true }
   })
 
   handle(IpcChannel.STT_UPDATE_TRANSCRIPT, async (_event, transcript: unknown) => {
-    if (typeof transcript !== 'string' || transcript.length > 16000) throw new Error('Invalid transcript')
+    if (!transcript || typeof transcript !== 'object' || !('text' in transcript) || !('turnId' in transcript) ||
+      typeof transcript.text !== 'string' || transcript.text.length > 16000 ||
+      typeof transcript.turnId !== 'number' || !Number.isSafeInteger(transcript.turnId)) throw new Error('Invalid transcript')
     const { voiceStateMachine } = await import('../state/voice-state-machine')
     if (voiceStateMachine.getState() !== 'listening') throw new Error('No active recording')
     const { initOrchestrator } = await import('../orchestrator')
     const orchestrator = initOrchestrator()
-    orchestrator.setUtterance(transcript)
+    orchestrator.setUtterance(transcript.text, transcript.turnId)
     return { success: true }
   })
 
@@ -120,4 +126,5 @@ function handle(channel: IpcChannel, handler: (event: IpcMainInvokeEvent, payloa
     if (args.length > 1) throw new Error('Unexpected IPC arguments')
     return handler(event, args[0])
   })
+
 }

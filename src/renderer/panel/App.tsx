@@ -77,8 +77,10 @@ function App(): React.JSX.Element {
     if (!window.pipAPI) return
     if (voiceState === 'idle') {
       window.pipAPI.triggerPushToTalkPress()
-    } else {
+    } else if (voiceState === 'listening') {
       window.pipAPI.triggerPushToTalkRelease()
+    } else {
+      void window.pipAPI.cancelTurn().catch(() => setSettingsError('Could not stop the voice turn. Please try again.'))
     }
   }
 

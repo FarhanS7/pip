@@ -32,7 +32,7 @@ describe('Renderer authority', () => {
     const transcript = host.handlers.get(IpcChannel.STT_UPDATE_TRANSCRIPT)!
     await expect(transcript(fixture('overlay').event, { text: 'bad shape' })).rejects.toThrow('Invalid transcript')
     await expect(transcript(fixture('overlay').event, 'x'.repeat(16001))).rejects.toThrow('Invalid transcript')
-    await expect(transcript(fixture('overlay').event, 'late')).rejects.toThrow('No active recording')
+    await expect(transcript(fixture('overlay').event, { text: 'late', turnId: 1 })).rejects.toThrow('No active recording')
   })
   it('accepts the panel and limits the overlay to reads and transcript submission', () => {
     const panel = fixture('panel'), overlay = fixture('overlay')

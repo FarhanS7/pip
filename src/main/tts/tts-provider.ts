@@ -7,7 +7,7 @@ export interface TTSProvider {
   readonly displayName: string
   readonly requiresApiKey: boolean
   /** Synthesize and speak spoken text */
-  speak(text: string): Promise<void>
+  speak(text: string, signal?: AbortSignal): Promise<void>
   /** Immediately halt active audio playback */
   stop(): void
 }

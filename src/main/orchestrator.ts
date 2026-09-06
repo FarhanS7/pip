@@ -1,252 +1,191 @@
-/**
- * Central Orchestrator Pipeline (Task F.4)
- *
- * Connects Voice State Machine, STT, Multi-Monitor Screen Capture, AI Vision Streaming Providers,
- * Response Parser, Coordinate Mapper, TTS, and IPC broadcasts into a cohesive end-to-end loop.
- *
- * References:
- *   PHASE_0_ARCHITECTURE.md §0.1 (main module)
- *   PHASE_1_MODULES_AND_TASKS.md Task F.4 scoped checklist
- */
-
 import { BrowserWindow } from 'electron'
 import { voiceStateMachine } from './state/voice-state-machine'
-import { VoiceState } from '../shared/types/ipc'
+import type { SettingsPayload, IpcEventPayloads } from '../shared/types/ipc'
 import { getSettings } from './state/settings'
 import { createSTTProvider, STTSession } from './audio/stt-provider'
-import { createAIProvider, VisionPromptPayload, ChatMessage } from './ai/ai-provider'
+import { createAIProvider, ChatMessage } from './ai/ai-provider'
 import { createTTSProvider, TTSProvider } from './tts/tts-provider'
-import { captureAllScreens, CapturedDisplay } from './screen/screen-capture'
+import { captureAllScreens } from './screen/screen-capture'
 import { buildSystemPrompt, DisplayInfo } from './ai/system-prompt-builder'
 import { parsePointingCoordinates } from './ai/response-parser'
 import { mapToGlobalScreenCoordinates } from './state/coordinate-mapper'
 import { conversationHistory } from './state/conversation'
 import { IpcChannel } from './ipc/channels'
-import type { IpcEventPayloads } from '../shared/types/ipc'
 import { createLogger } from './logger'
 
 const log = createLogger('orchestrator')
+interface Turn {
+  id: number
+  controller: AbortController
+  settings: SettingsPayload
+  utterance: string
+  acceptingTranscript: boolean
+  ready: Promise<void>
+  stt: STTSession | null
+  closing: Promise<void> | null
+  tts: TTSProvider | null
+  processing: boolean
+}
 
 export class Orchestrator {
-  private activeSttSession: STTSession | null = null
-  private currentUtterance: string = ''
-  private activeTtsProvider: TTSProvider | null = null
-  private unsubscribeState: (() => void) | null = null
-
-  public setUtterance(text: string): void {
-    if (text && text.trim()) {
-      this.currentUtterance = text.trim()
-      log.info('Orchestrator utterance updated', { text: this.currentUtterance })
-    }
-  }
+  private turn: Turn | null = null
+  private unsubscribeState: (() => void) | null
+  private completedTts: TTSProvider | null = null
 
   constructor() {
-    log.info('Initializing Central Orchestrator Pipeline')
-    this.unsubscribeState = voiceStateMachine.onStateChange((state, reason) => {
-      this.handleStateChange(state, reason).catch((err) => {
-        log.error('Error handling orchestrator state change', { state, reason, error: String(err) })
-        voiceStateMachine.reset('orchestrator-error')
-      })
+    this.unsubscribeState = voiceStateMachine.onStateChange(state => {
+      if (state === 'listening') this.beginTurn()
+      else if (state === 'idle') this.releaseTurn()
+      else if (state === 'processing' && this.turn && !this.turn.processing) {
+        const turn = this.turn
+        turn.processing = true
+        void this.processTurn(turn).catch(error => {
+          if (!this.owns(turn)) return
+          log.error('Voice turn failed', { turnId: turn.id, error: String(error) })
+          this.cancel('turn-error')
+        })
+      }
     })
   }
 
-  private async handleStateChange(state: VoiceState, reason?: string): Promise<void> {
-    log.info('Orchestrator state change received', { state, reason })
+  private owns(turn: Turn): boolean {
+    return this.turn === turn && !turn.controller.signal.aborted
+  }
 
-    switch (state) {
-      case 'listening':
-        await this.startListening()
-        break
-      case 'processing':
-        await this.startProcessing()
-        break
-      case 'responding':
-        // Handled in startProcessing stream loop
-        break
-      case 'idle':
-        await this.handleIdle()
-        break
+  public setUtterance(text: string, turnId: number): void {
+    const turn = this.turn
+    if (turn && turn.id === turnId && turn.acceptingTranscript && voiceStateMachine.getState() === 'listening' && text.trim()) {
+      turn.utterance = text.trim()
     }
   }
 
-  private async startListening(): Promise<void> {
-    this.currentUtterance = ''
-    this.stopTTS()
+  private beginTurn(): void {
+    this.releaseTurn()
+    this.completedTts?.stop()
+    this.completedTts = null
+    const turn: Turn = {
+      id: voiceStateMachine.getTurnId(), controller: new AbortController(), settings: getSettings(),
+      utterance: '', acceptingTranscript: true, ready: Promise.resolve(),
+      stt: null, closing: null, tts: null, processing: false
+    }
+    this.turn = turn
+    turn.ready = this.openStt(turn)
+  }
 
+  private async openStt(turn: Turn): Promise<void> {
     try {
-      const sttType = getSettings().selectedSTTProvider
-      log.info('Creating STT session for listening', { sttType })
-      const sttProvider = createSTTProvider(sttType)
-      this.activeSttSession = await sttProvider.createSession()
-
-      this.activeSttSession.onTranscript((evt) => {
-        this.currentUtterance = evt.text
-        log.debug('STT transcript updated', { text: evt.text, isFinal: evt.isFinal })
+      const session = await createSTTProvider(turn.settings.selectedSTTProvider).createSession()
+      turn.stt = session
+      if (!this.owns(turn)) { await this.closeStt(turn); return }
+      session.onTranscript(event => {
+        if (this.owns(turn) && turn.acceptingTranscript) turn.utterance = event.text
       })
-
-      this.activeSttSession.onError((err) => {
-        log.error('STT session error', { error: err.message })
+      session.onError(error => {
+        if (this.owns(turn)) log.warn('STT session error', { turnId: turn.id, error: String(error) })
       })
-    } catch (err) {
-      log.warn('Could not initialize active STT provider, falling back to ambient mode', { error: String(err) })
+    } catch (error) {
+      if (this.owns(turn)) log.warn('STT unavailable for turn', { turnId: turn.id, error: String(error) })
     }
   }
 
-  private async startProcessing(): Promise<void> {
-    if (this.activeSttSession) {
-      try {
-        await this.activeSttSession.close()
-      } catch {
-        // Ignore session close error
-      }
-      this.activeSttSession = null
-    }
+  private closeStt(turn: Turn): Promise<void> {
+    if (!turn.stt) return Promise.resolve()
+    turn.closing ??= Promise.resolve().then(() => turn.stt!.close()).catch(error => {
+      log.warn('STT cleanup failed', { turnId: turn.id, error: String(error) })
+    })
+    return turn.closing
+  }
 
-    log.info('Starting vision processing', { prompt: this.currentUtterance })
+  private releaseTurn(): void {
+    const turn = this.turn
+    this.turn = null // Revoke ownership before abort or callbacks can run.
+    if (!turn) return
+    turn.acceptingTranscript = false
+    turn.controller.abort()
+    try { turn.tts?.stop() } catch (error) { log.warn('TTS stop failed', { error: String(error) }) }
+    void this.closeStt(turn)
+  }
 
-    // 1. Capture screen displays
-    let capturedDisplays: DisplayInfo[] = []
-    let primaryJpegBase64: string | undefined = undefined
+  public cancel(reason = 'user-cancelled'): void {
+    this.releaseTurn()
+    this.completedTts?.stop()
+    this.completedTts = null
+    voiceStateMachine.reset(reason)
+  }
 
+  private async processTurn(turn: Turn): Promise<void> {
+    // A quick key release must wait for the session it started, not capture early.
+    await turn.ready
+    if (!this.owns(turn)) return
+    await this.closeStt(turn)
+    if (!this.owns(turn)) return
+    turn.acceptingTranscript = false
+
+    let displays: DisplayInfo[] = []
+    let screenshotJpegBase64: string | undefined
     try {
-      const screens: CapturedDisplay[] = await captureAllScreens()
-      if (screens.length > 0) {
-        primaryJpegBase64 = screens[0].jpegBase64
-        capturedDisplays = screens.map((s, idx) => ({
-          displayId: s.displayId,
-          screenIndex: idx,
-          bounds: s.bounds,
-          isPrimary: idx === 0
-        }))
-      }
-    } catch (err) {
-      log.error('Screen capture failed in orchestrator', { error: String(err) })
+      const screens = await captureAllScreens()
+      if (!this.owns(turn)) return
+      screenshotJpegBase64 = screens[0]?.jpegBase64
+      displays = screens.map((screen, screenIndex) => ({
+        displayId: screen.displayId, screenIndex, bounds: screen.bounds, isPrimary: screenIndex === 0
+      }))
+    } catch (error) {
+      if (!this.owns(turn)) return
+      log.warn('Screen capture failed', { turnId: turn.id, error: String(error) })
     }
-
-    // 2. Format messages from conversation history + current user query
-    const userQuery = this.currentUtterance.trim() || 'Please look at my screen and guide me.'
-
+    if (!this.owns(turn)) return
+    const query = turn.utterance.trim() || 'Please look at my screen and guide me.'
     const messages: ChatMessage[] = []
     for (const exchange of conversationHistory.getHistory()) {
-      if (exchange.userTranscript) {
-        messages.push({ role: 'user', content: exchange.userTranscript })
-      }
-      if (exchange.assistantResponse) {
-        messages.push({ role: 'assistant', content: exchange.assistantResponse })
-      }
+      if (exchange.userTranscript) messages.push({ role: 'user', content: exchange.userTranscript })
+      if (exchange.assistantResponse) messages.push({ role: 'assistant', content: exchange.assistantResponse })
     }
-    messages.push({ role: 'user', content: userQuery })
-
-    const systemPrompt = buildSystemPrompt({ displays: capturedDisplays })
-    const payload: VisionPromptPayload = {
-      messages,
-      screenshotJpegBase64: primaryJpegBase64,
-      systemPrompt
-    }
-
-    // 3. Initiate AI Provider streaming
-    const { selectedAIProvider: aiType, selectedAIModel } = getSettings()
-    log.info('Instantiating AI Vision provider', { aiType })
-    const aiProvider = createAIProvider(aiType, selectedAIModel)
-
-    // Transition state machine to responding
+    messages.push({ role: 'user', content: query })
+    const provider = createAIProvider(turn.settings.selectedAIProvider, turn.settings.selectedAIModel)
     voiceStateMachine.transitionTo('responding', 'ai-stream-start')
-
-    let fullResponse = ''
-    try {
-      const stream = aiProvider.streamChat(payload)
-      for await (const chunk of stream) {
-        fullResponse += chunk
-        this.broadcast(IpcChannel.AI_RESPONSE_CHUNK, { text: chunk })
-      }
-    } catch (err) {
-      log.error('AI streaming failed in orchestrator', { error: String(err) })
-      fullResponse = 'Sorry, I encountered an error communicating with the AI model.'
-      this.broadcast(IpcChannel.AI_RESPONSE_CHUNK, { text: fullResponse })
+    let response = ''
+    for await (const chunk of provider.streamChat({
+      messages, screenshotJpegBase64, systemPrompt: buildSystemPrompt({ displays }), signal: turn.controller.signal
+    })) {
+      if (!this.owns(turn)) return
+      response += chunk
+      this.broadcast(IpcChannel.AI_RESPONSE_CHUNK, { text: chunk })
     }
-
-    // 4. Parse response tags and coordinates
-    const parsed = parsePointingCoordinates(fullResponse)
-    conversationHistory.add(userQuery, parsed.spokenText)
-
+    if (!this.owns(turn)) return
+    const parsed = parsePointingCoordinates(response)
     if (parsed.coordinate) {
-      const screenIdx = parsed.screenNumber ? Math.max(0, parsed.screenNumber - 1) : 0
-      const mapped = mapToGlobalScreenCoordinates(
-        parsed.coordinate,
-        screenIdx,
-        capturedDisplays
-      )
-
-      log.info('AI Point detected and mapped', { coordinate: parsed.coordinate, mapped })
-
+      const mapped = mapToGlobalScreenCoordinates(parsed.coordinate, Math.max(0, (parsed.screenNumber ?? 1) - 1), displays)
       this.broadcast(IpcChannel.CURSOR_POSITION, {
-        x: mapped.globalX,
-        y: mapped.globalY,
-        label: parsed.elementLabel,
-        screenIndex: mapped.screenIndex
+        x: mapped.globalX, y: mapped.globalY, label: parsed.elementLabel, screenIndex: mapped.screenIndex
       })
     }
-
-    // 5. Speak response with TTS Provider
-    const ttsType = getSettings().selectedTTSProvider
-    log.info('Instantiating TTS provider for spoken response', { ttsType })
-
-    try {
-      this.activeTtsProvider = createTTSProvider(ttsType)
-      await this.activeTtsProvider.speak(parsed.spokenText)
-    } catch (err) {
-      log.error('TTS playback failed in orchestrator', { error: String(err) })
-    } finally {
-      this.activeTtsProvider = null
-      voiceStateMachine.transitionTo('idle', 'tts-ended')
-    }
-  }
-
-  private async handleIdle(): Promise<void> {
-    if (this.activeSttSession) {
-      await this.activeSttSession.close()
-      this.activeSttSession = null
-    }
-    this.stopTTS()
-  }
-
-  private stopTTS(): void {
-    if (this.activeTtsProvider) {
-      this.activeTtsProvider.stop()
-      this.activeTtsProvider = null
-    }
+    turn.tts = createTTSProvider(turn.settings.selectedTTSProvider)
+    await turn.tts.speak(parsed.spokenText, turn.controller.signal)
+    if (!this.owns(turn)) return
+    // Only a still-current completed turn is included in future conversation context.
+    conversationHistory.add(query, parsed.spokenText)
+    this.completedTts = turn.tts
+    turn.tts = null
+    voiceStateMachine.transitionTo('idle', 'tts-ended')
   }
 
   private broadcast<C extends keyof IpcEventPayloads>(channel: C, payload: IpcEventPayloads[C]): void {
-    const windows = BrowserWindow.getAllWindows()
-    for (const win of windows) {
-      if (!win.isDestroyed()) {
-        win.webContents.send(channel, payload)
-      }
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed()) win.webContents.send(channel, payload)
     }
   }
 
   public destroy(): void {
-    if (this.unsubscribeState) {
-      this.unsubscribeState()
-      this.unsubscribeState = null
-    }
-    if (this.activeSttSession) {
-      this.activeSttSession.close()
-      this.activeSttSession = null
-    }
-    this.stopTTS()
+    this.unsubscribeState?.()
+    this.unsubscribeState = null
+    this.cancel('orchestrator-destroyed')
   }
 }
 
 let orchestratorInstance: Orchestrator | null = null
-
-/**
- * Initialize the global Orchestrator pipeline.
- */
-export function initOrchestrator(): Orchestrator {
-  if (!orchestratorInstance) {
-    orchestratorInstance = new Orchestrator()
-  }
-  return orchestratorInstance
+export function initOrchestrator(): Orchestrator { return orchestratorInstance ??= new Orchestrator() }
+export function destroyOrchestrator(): void {
+  orchestratorInstance?.destroy()
+  orchestratorInstance = null
 }

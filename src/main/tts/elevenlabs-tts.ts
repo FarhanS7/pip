@@ -32,7 +32,8 @@ export class ElevenLabsTTSProvider implements TTSProvider {
     this.sharedSecret = sharedSecret
   }
 
-  public async speak(text: string): Promise<void> {
+  public async speak(text: string, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
     if (!text || !text.trim()) return
 
     this.stop()
@@ -42,6 +43,7 @@ export class ElevenLabsTTSProvider implements TTSProvider {
     try {
       response = await fetch(`${this.workerUrl}/tts`, {
         method: 'POST',
+        signal,
         headers: {
           'content-type': 'application/json',
           'X-Pip-Auth': this.sharedSecret
@@ -63,6 +65,7 @@ export class ElevenLabsTTSProvider implements TTSProvider {
     }
 
     const audioArrayBuffer = await response.arrayBuffer()
+    signal?.throwIfAborted()
     const blob = new Blob([audioArrayBuffer], { type: 'audio/mpeg' })
     const audioUrl = URL.createObjectURL(blob)
 

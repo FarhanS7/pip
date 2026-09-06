@@ -77,6 +77,7 @@ export class OpenAIProvider implements AIProvider {
     try {
       response = await fetch(`${this.workerUrl}/chat`, {
         method: 'POST',
+        signal: payload.signal,
         headers: {
           'content-type': 'application/json',
           'X-Pip-Auth': this.sharedSecret

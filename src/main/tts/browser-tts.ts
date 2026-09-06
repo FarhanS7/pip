@@ -19,7 +19,8 @@ export class BrowserTTSProvider implements TTSProvider {
   public readonly displayName = 'Browser SpeechSynthesis (Fallback)'
   public readonly requiresApiKey = false
 
-  public async speak(text: string): Promise<void> {
+  public async speak(text: string, signal?: AbortSignal): Promise<void> {
+    signal?.throwIfAborted()
     if (!text || !text.trim()) return
 
     log.info('Browser TTS speaking via renderer IPC', { length: text.length })

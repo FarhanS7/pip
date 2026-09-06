@@ -29,6 +29,7 @@ function App(): React.JSX.Element {
   const [targetRect, setTargetRect] = useState<BoundingBoxRect | null>(null)
   const [targetLabel, setTargetLabel] = useState<string>('')
   const [cursorEnabled, setCursorEnabled] = useState(false)
+  const [turnId, setTurnId] = useState(0)
 
   useEffect(() => {
     if (window.pipAPI) return subscribeCursorVisibility(window.pipAPI, setCursorEnabled)
@@ -39,6 +40,7 @@ function App(): React.JSX.Element {
 
     const unsubscribe = subscribeOverlayEvents(window.pipAPI, {
       setVoiceState,
+      setTurnId,
       resetResponse: () => {
         setResponseText('')
         setTargetRect(null)
@@ -91,7 +93,7 @@ function App(): React.JSX.Element {
               transcript += event.results[i][0].transcript
             }
             if (transcript.trim() && window.pipAPI) {
-              void window.pipAPI.updateTranscript(transcript).catch(() => { /* Late or invalid transcripts are refused by main. */ })
+              void window.pipAPI.updateTranscript(transcript, turnId).catch(() => { /* Late or invalid transcripts are refused by main. */ })
             }
           }
 
@@ -115,7 +117,7 @@ function App(): React.JSX.Element {
         }
       }
     }
-  }, [voiceState])
+  }, [voiceState, turnId])
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>

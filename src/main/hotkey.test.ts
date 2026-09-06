@@ -65,7 +65,7 @@ describe('Global Hotkey (Push-to-Talk)', () => {
     expect(isPushToTalkCurrentlyActive()).toBe(true)
     expect(mockSend).toHaveBeenCalledWith('state:voice-changed', {
       state: 'listening',
-      reason: 'hotkey-press'
+      reason: 'hotkey-press', turnId: expect.any(Number)
     })
   })
 
@@ -121,8 +121,17 @@ describe('Global Hotkey (Push-to-Talk)', () => {
     expect(isPushToTalkCurrentlyActive()).toBe(false)
     expect(mockSend).toHaveBeenCalledWith('state:voice-changed', {
       state: 'processing',
-      reason: 'hotkey-release'
+      reason: 'hotkey-release', turnId: expect.any(Number)
     })
+  })
+
+  it('does not end a new panel turn when an old held shortcut is released', () => {
+    registerGlobalHotkey()
+    registeredShortcutCallback!()
+    voiceStateMachine.reset('cancel')
+    voiceStateMachine.transitionTo('listening', 'new-panel-turn')
+    mockUIHook.emit('keyup', { keycode: 57 })
+    expect(voiceStateMachine.getState()).toBe('listening')
   })
 
   it('fires safety-net timeout after 60s if release detection fails', () => {
@@ -137,7 +146,7 @@ describe('Global Hotkey (Push-to-Talk)', () => {
     expect(isPushToTalkCurrentlyActive()).toBe(false)
     expect(mockSend).toHaveBeenCalledWith('state:voice-changed', {
       state: 'processing',
-      reason: 'hotkey-release'
+      reason: 'hotkey-release', turnId: expect.any(Number)
     })
   })
 })
