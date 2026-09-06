@@ -22,6 +22,8 @@ function subscribe<C extends keyof IpcEventPayloads>(
 }
 
 const pipAPI: PipAPI = {
+  mediaReady: () => ipcRenderer.invoke(IpcChannel.MEDIA_READY),
+  reportPlayback: (requestId, status) => ipcRenderer.invoke(IpcChannel.MEDIA_PLAYBACK_RESULT, { requestId, status }),
   updateTranscript: (text, turnId) => ipcRenderer.invoke(IpcChannel.STT_UPDATE_TRANSCRIPT, { text, turnId }),
   onSpeak: (callback) => subscribe(IpcChannel.TTS_SPEAK, callback),
   onStopSpeaking: (callback) => subscribe(IpcChannel.TTS_STOP, callback),

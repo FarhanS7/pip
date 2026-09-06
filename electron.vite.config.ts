@@ -38,6 +38,7 @@ export default defineConfig({
       rollupOptions: {
         input: {
           panel: resolve(__dirname, 'src/renderer/panel/index.html'),
+          media: resolve(__dirname, 'src/renderer/media/index.html'),
           overlay: resolve(__dirname, 'src/renderer/overlay/index.html')
         }
       }

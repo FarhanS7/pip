@@ -11,8 +11,10 @@ export type TextChunkPayload = AIResponseChunkPayload
 
 export interface PipAPI {
   updateTranscript: (text: string, turnId: number) => Promise<void>
-  onSpeak: (callback: (payload: { text: string }) => void) => () => void
-  onStopSpeaking: (callback: () => void) => () => void
+  onSpeak: (callback: (payload: { requestId: number; text: string }) => void) => () => void
+  onStopSpeaking: (callback: (payload: { requestId: number }) => void) => () => void
+  mediaReady: () => Promise<void>
+  reportPlayback: (requestId: number, status: 'ended' | 'error') => Promise<void>
   // Settings
   getSettings: () => Promise<SettingsPayload>
   getSettingsNotice: () => Promise<string | null>

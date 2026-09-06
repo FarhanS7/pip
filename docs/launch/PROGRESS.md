@@ -62,3 +62,7 @@ B08 IPC sender/role checks, named preload methods, navigation restrictions, scop
 B11 turn-owned state, cancellation IPC, reset/shutdown cleanup, transcript/key-release turn IDs and AI/TTS abort-signal forwarding are implemented; local checks passed; independent review pending. Delayed canceled work cannot publish into a newer turn in the regression suite. Provider startup and actual playback completion remain limited by existing media adapters. Next: B12 single media renderer and acknowledgement handshake, then B13/B14/B16 provider transport.
 
 B11 final verification: 14 test files / 79 tests passed; lint, app/Worker/test typechecks and production build passed. Existing mixed-import build warnings remain.
+
+## B12 execution update
+
+B12 single hidden media renderer, readiness/playback acknowledgements, browser audio ownership and crash handling are implemented; checks passed; independent review pending. Full suite: 85 tests / 17 files. Lint/typechecks/build pass, including the new media renderer bundle. The final startup/recreation fix passed focused tests and rebuild. Native audible playback and provider media adapters remain unqualified. Next: B13 microphone/worklet/PCM transport, then B14 STT and B16 paid TTS integration.

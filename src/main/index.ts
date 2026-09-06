@@ -16,6 +16,8 @@ import { createPanelWindow, togglePanelWindow, showPanelWindow } from './windows
 import { createOverlayWindows, destroyAllOverlayWindows } from './windows/overlay-window'
 import { registerGlobalHotkey, unregisterAllHotkeys, prepareHotkeyChange } from './hotkey'
 import { initOrchestrator, destroyOrchestrator } from './orchestrator'
+import { createMediaWindow, destroyMediaWindow } from './windows/media-window'
+import { voiceStateMachine } from './state/voice-state-machine'
 import { initSettingsStore, getSettings, setSettingsEffect, reportSettingsNotice } from './state/settings'
 
 const log = createLogger('shell')
@@ -50,6 +52,10 @@ app.whenReady().then(async () => {
   }
   setSettingsEffect(next => prepareHotkeyChange(next.pushToTalkHotkey))
   registerIpcHandlers()
+  createMediaWindow()
+  voiceStateMachine.onStateChange(state => {
+    if (state === 'listening') createMediaWindow()
+  })
 
   // Initialize central orchestrator pipeline
   initOrchestrator()
@@ -78,6 +84,7 @@ app.on('before-quit', () => {
   log.info('App shutting down — cleaning up resources')
   unregisterAllHotkeys()
   destroyOrchestrator()
+  destroyMediaWindow()
   destroyAllOverlayWindows()
   destroySystemTray()
 })

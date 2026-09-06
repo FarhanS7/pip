@@ -29,7 +29,7 @@ function App(): React.JSX.Element {
   const [targetRect, setTargetRect] = useState<BoundingBoxRect | null>(null)
   const [targetLabel, setTargetLabel] = useState<string>('')
   const [cursorEnabled, setCursorEnabled] = useState(false)
-  const [turnId, setTurnId] = useState(0)
+
 
   useEffect(() => {
     if (window.pipAPI) return subscribeCursorVisibility(window.pipAPI, setCursorEnabled)
@@ -40,7 +40,7 @@ function App(): React.JSX.Element {
 
     const unsubscribe = subscribeOverlayEvents(window.pipAPI, {
       setVoiceState,
-      setTurnId,
+
       resetResponse: () => {
         setResponseText('')
         setTargetRect(null)
@@ -55,69 +55,8 @@ function App(): React.JSX.Element {
       appendText: (text) => setResponseText((previous) => previous + text)
     })
 
-    const stopSpeak = window.pipAPI.onSpeak((data) => {
-        if ('speechSynthesis' in window && data && data.text) {
-          window.speechSynthesis.cancel()
-          const utterance = new SpeechSynthesisUtterance(data.text)
-          window.speechSynthesis.speak(utterance)
-        }
-      })
-    const stopStop = window.pipAPI.onStopSpeaking(() => {
-        if ('speechSynthesis' in window) {
-          window.speechSynthesis.cancel()
-        }
-      })
-
-    return () => {
-      stopSpeak()
-      stopStop()
-      unsubscribe()
-    }
+    return unsubscribe
   }, [])
-
-  useEffect(() => {
-    let recognition: any = null
-
-    if (voiceState === 'listening') {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition
-      if (SpeechRecognition) {
-        try {
-          recognition = new SpeechRecognition()
-          recognition.continuous = true
-          recognition.interimResults = true
-          recognition.lang = 'en-US'
-
-          recognition.onresult = (event: any) => {
-            let transcript = ''
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-              transcript += event.results[i][0].transcript
-            }
-            if (transcript.trim() && window.pipAPI) {
-              void window.pipAPI.updateTranscript(transcript, turnId).catch(() => { /* Late or invalid transcripts are refused by main. */ })
-            }
-          }
-
-          recognition.onerror = (err: any) => {
-            console.warn('[speech-recognition] Error:', err)
-          }
-
-          recognition.start()
-        } catch (err) {
-          console.warn('[speech-recognition] Could not start:', err)
-        }
-      }
-    }
-
-    return () => {
-      if (recognition) {
-        try {
-          recognition.stop()
-        } catch {
-          // ignore
-        }
-      }
-    }
-  }, [voiceState, turnId])
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative', overflow: 'hidden' }}>

@@ -7,7 +7,7 @@ vi.mock('../state/voice-state-machine', () => ({ voiceStateMachine: { getState: 
 import { authorizeIpc, secureRenderer, rendererURL, installPermissionPolicy } from './security'
 import { IpcChannel } from '../../shared/channels'
 
-function fixture(role: 'panel' | 'overlay', register = true) {
+function fixture(role: 'panel' | 'overlay' | 'media', register = true) {
   const url = `file:///app/${role}/index.html`
   const contents = Object.assign(new EventEmitter(), {
     mainFrame: { url }, isDestroyed: vi.fn(() => false), setWindowOpenHandler: vi.fn()
@@ -30,18 +30,22 @@ describe('Renderer authority', () => {
     await expect(read(fixture('panel').event)).resolves.toHaveProperty('cursorEnabled')
     expect(() => read(fixture('panel').event, {}, {})).toThrow('arguments')
     const transcript = host.handlers.get(IpcChannel.STT_UPDATE_TRANSCRIPT)!
-    await expect(transcript(fixture('overlay').event, { text: 'bad shape' })).rejects.toThrow('Invalid transcript')
-    await expect(transcript(fixture('overlay').event, 'x'.repeat(16001))).rejects.toThrow('Invalid transcript')
-    await expect(transcript(fixture('overlay').event, { text: 'late', turnId: 1 })).rejects.toThrow('No active recording')
+    await expect(transcript(fixture('media').event, { text: 'bad shape' })).rejects.toThrow('Invalid transcript')
+    await expect(transcript(fixture('media').event, 'x'.repeat(16001))).rejects.toThrow('Invalid transcript')
+    await expect(transcript(fixture('media').event, { text: 'late', turnId: 1 })).rejects.toThrow('No active recording')
   })
-  it('accepts the panel and limits the overlay to reads and transcript submission', () => {
-    const panel = fixture('panel'), overlay = fixture('overlay')
+  it('limits media actions to the media renderer and keeps overlays read-only', () => {
+    const panel = fixture('panel'), overlay = fixture('media')
     expect(() => authorizeIpc(panel.event, IpcChannel.SETTINGS_SET)).not.toThrow()
     expect(() => authorizeIpc(overlay.event, IpcChannel.SETTINGS_GET)).not.toThrow()
     expect(() => authorizeIpc(overlay.event, IpcChannel.STT_UPDATE_TRANSCRIPT)).not.toThrow()
     expect(() => authorizeIpc(overlay.event, IpcChannel.SETTINGS_SET)).toThrow()
     expect(() => authorizeIpc(panel.event, IpcChannel.STT_UPDATE_TRANSCRIPT)).toThrow()
     expect(() => authorizeIpc(panel.event, 'unknown:action')).toThrow()
+    expect(() => authorizeIpc(overlay.event, IpcChannel.MEDIA_READY)).not.toThrow()
+    expect(() => authorizeIpc(overlay.event, IpcChannel.MEDIA_PLAYBACK_RESULT)).not.toThrow()
+    expect(() => authorizeIpc(fixture('overlay').event, IpcChannel.STT_UPDATE_TRANSCRIPT)).toThrow()
+    expect(() => authorizeIpc(panel.event, IpcChannel.MEDIA_PLAYBACK_RESULT)).toThrow()
   })
   it('rejects an unregistered window even if it loads the same app URL', () => {
     expect(() => authorizeIpc(fixture('panel', false).event, IpcChannel.APP_QUIT)).toThrow()
@@ -86,8 +90,8 @@ describe('Renderer authority', () => {
 })
 
 describe('Permission policy', () => {
-  it('allows audio only in the trusted overlay main frame during listening', () => {
-    const overlay = fixture('overlay'), panel = fixture('panel')
+  it('allows audio only in the trusted media main frame during listening', () => {
+    const overlay = fixture('media'), panel = fixture('panel')
     const check = vi.fn(), request = vi.fn()
     installPermissionPolicy({ setPermissionCheckHandler: check, setPermissionRequestHandler: request } as unknown as Session)
     const checkPermission = check.mock.calls[0][0] as NonNullable<Parameters<Session['setPermissionCheckHandler']>[0]>
@@ -97,6 +101,7 @@ describe('Permission policy', () => {
     host.state = 'listening'
     expect(checkPermission(overlay.event.sender, 'media', '', details)).toBe(true)
     expect(checkPermission(panel.event.sender, 'media', '', details)).toBe(false)
+    expect(checkPermission(fixture('overlay').event.sender, 'media', '', details)).toBe(false)
     expect(checkPermission(overlay.event.sender, 'media', '', { ...details, isMainFrame: false })).toBe(false)
     expect(checkPermission(overlay.event.sender, 'media', '', { ...details, mediaType: 'video' })).toBe(false)
     expect(checkPermission(overlay.event.sender, 'notifications', '', details)).toBe(false)

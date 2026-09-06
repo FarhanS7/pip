@@ -29,6 +29,8 @@ export enum IpcChannel {
   STT_UPDATE_TRANSCRIPT = 'stt:update_transcript',
   TTS_SPEAK = 'tts:speak',
   TTS_STOP = 'tts:stop',
+  MEDIA_READY = 'media:ready',
+  MEDIA_PLAYBACK_RESULT = 'media:playback-result',
   /** Main → Renderer: Audio power level update (for waveform visualizer) */
   AUDIO_POWER_LEVEL = 'audio:power-level',
   /** Main → Renderer: Transcript text update (partial or final) */

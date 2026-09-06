@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 import { IpcChannel } from '../../shared/channels'
 import { voiceStateMachine } from '../state/voice-state-machine'
 
-export type RendererRole = 'panel' | 'overlay'
+export type RendererRole = 'panel' | 'overlay' | 'media'
 const renderers = new WeakMap<WebContents, { role: RendererRole; url: string }>()
 
 export function rendererURL(role: RendererRole): string {
@@ -62,13 +62,13 @@ export function authorizeIpc(event: IpcMainInvokeEvent, channel: string): void {
   const role = trustedRole(event.sender)
   if (!role || !event.senderFrame || event.senderFrame !== event.sender.mainFrame) throw new Error('Untrusted IPC sender')
   if (readChannels.has(channel) || (role === 'panel' && panelChannels.has(channel)) ||
-    (role === 'overlay' && channel === IpcChannel.STT_UPDATE_TRANSCRIPT)) return
+    (role === 'media' && [IpcChannel.STT_UPDATE_TRANSCRIPT, IpcChannel.MEDIA_READY, IpcChannel.MEDIA_PLAYBACK_RESULT].includes(channel as IpcChannel))) return
   throw new Error('IPC action is not available to this window')
 }
 
 export function installPermissionPolicy(session: Session): void {
   const canRecord = (contents: WebContents | null, isMainFrame: boolean, url?: string) => {
-    return isMainFrame && trustedRole(contents) === 'overlay' &&
+    return isMainFrame && trustedRole(contents) === 'media' &&
       (!url || sameDocument(url, renderers.get(contents!)!.url)) && voiceStateMachine.getState() === 'listening'
   }
   session.setPermissionCheckHandler((contents, permission, _origin, details) =>

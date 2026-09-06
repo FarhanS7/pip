@@ -22,6 +22,19 @@ const log = createLogger('ipc')
  */
 export function registerIpcHandlers(): void {
   log.info('Registering IPC handlers')
+  handle(IpcChannel.MEDIA_READY, async (event) => {
+    const { mediaPlayback } = await import('../windows/media-window')
+    const { voiceStateMachine } = await import('../state/voice-state-machine')
+    mediaPlayback.markReady()
+    event.sender.send(IpcChannel.VOICE_STATE_CHANGED, { state: voiceStateMachine.getState(), turnId: voiceStateMachine.getTurnId() })
+  })
+  handle(IpcChannel.MEDIA_PLAYBACK_RESULT, async (_event, payload: unknown) => {
+    if (!payload || typeof payload !== 'object' || !('requestId' in payload) || !('status' in payload) ||
+      typeof payload.requestId !== 'number' || !Number.isSafeInteger(payload.requestId) ||
+      (payload.status !== 'ended' && payload.status !== 'error')) throw new Error('Invalid playback result')
+    const { mediaPlayback } = await import('../windows/media-window')
+    mediaPlayback.complete({ requestId: payload.requestId, status: payload.status })
+  })
   handle(IpcChannel.CANCEL_TURN, async () => {
     const { initOrchestrator } = await import('../orchestrator')
     initOrchestrator().cancel()
