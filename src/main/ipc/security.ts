@@ -62,7 +62,8 @@ export function authorizeIpc(event: IpcMainInvokeEvent, channel: string): void {
   const role = trustedRole(event.sender)
   if (!role || !event.senderFrame || event.senderFrame !== event.sender.mainFrame) throw new Error('Untrusted IPC sender')
   if (readChannels.has(channel) || (role === 'panel' && panelChannels.has(channel)) ||
-    (role === 'media' && [IpcChannel.STT_UPDATE_TRANSCRIPT, IpcChannel.MEDIA_READY, IpcChannel.MEDIA_PLAYBACK_RESULT].includes(channel as IpcChannel))) return
+    (role === 'media' && [IpcChannel.STT_UPDATE_TRANSCRIPT, IpcChannel.MEDIA_READY, IpcChannel.MEDIA_PLAYBACK_RESULT,
+      IpcChannel.MEDIA_AUDIO_CHUNK, IpcChannel.MEDIA_AUDIO_STOPPED, IpcChannel.MEDIA_AUDIO_FAILED].includes(channel as IpcChannel))) return
   throw new Error('IPC action is not available to this window')
 }
 

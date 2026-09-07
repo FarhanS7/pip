@@ -22,6 +22,26 @@ const log = createLogger('ipc')
  */
 export function registerIpcHandlers(): void {
   log.info('Registering IPC handlers')
+  handle(IpcChannel.MEDIA_AUDIO_CHUNK, async (_event, payload) => {
+    if (!payload || typeof payload !== 'object' || !('turnId' in payload) || !('sequence' in payload) || !('buffer' in payload) ||
+      typeof payload.turnId !== 'number' || !Number.isSafeInteger(payload.turnId) ||
+      typeof payload.sequence !== 'number' || !Number.isSafeInteger(payload.sequence) || payload.sequence < 0 ||
+      !(payload.buffer instanceof ArrayBuffer) || payload.buffer.byteLength < 2 || payload.buffer.byteLength > 3200 || payload.buffer.byteLength % 2) {
+      throw new Error('Invalid audio chunk')
+    }
+    const { initOrchestrator } = await import('../orchestrator')
+    await initOrchestrator().receiveAudio(payload.turnId, payload.sequence, payload.buffer)
+  })
+  handle(IpcChannel.MEDIA_AUDIO_STOPPED, async (_event, turnId) => {
+    if (typeof turnId !== 'number' || !Number.isSafeInteger(turnId)) throw new Error('Invalid audio turn')
+    const { initOrchestrator } = await import('../orchestrator')
+    initOrchestrator().audioStopped(turnId)
+  })
+  handle(IpcChannel.MEDIA_AUDIO_FAILED, async (_event, turnId) => {
+    if (typeof turnId !== 'number' || !Number.isSafeInteger(turnId)) throw new Error('Invalid audio turn')
+    const { initOrchestrator } = await import('../orchestrator')
+    initOrchestrator().audioFailed(turnId)
+  })
   handle(IpcChannel.MEDIA_READY, async (event) => {
     const { mediaPlayback } = await import('../windows/media-window')
     const { voiceStateMachine } = await import('../state/voice-state-machine')

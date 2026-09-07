@@ -58,8 +58,9 @@ export class AssemblyAISTTSession implements STTSession {
 
   public sendAudio(chunk: ArrayBuffer): void {
     if (this.isClosed || !this.ws || this.ws.readyState !== 1 /* OPEN */) {
-      return
+      throw new STTError('STT_SESSION_CLOSED', 'Cannot send audio to a closed transcription session')
     }
+    if (this.ws.bufferedAmount > 160000) throw new STTError('STT_BACKPRESSURE', 'Transcription connection is too slow')
     this.ws.send(chunk)
   }
 

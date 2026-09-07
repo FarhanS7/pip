@@ -66,3 +66,7 @@ B11 final verification: 14 test files / 79 tests passed; lint, app/Worker/test t
 ## B12 execution update
 
 B12 single hidden media renderer, readiness/playback acknowledgements, browser audio ownership and crash handling are implemented; checks passed; independent review pending. Full suite: 85 tests / 17 files. Lint/typechecks/build pass, including the new media renderer bundle. The final startup/recreation fix passed focused tests and rebuild. Native audible playback and provider media adapters remain unqualified. Next: B13 microphone/worklet/PCM transport, then B14 STT and B16 paid TTS integration.
+
+## B13 execution update
+
+B13 microphone capture, mono 16 kHz PCM16 worklet conversion, bounded serial transport and stop/drain acknowledgement are implemented; local checks passed; independent review pending. Full suite: 94 tests / 18 files. Lint, app/Worker/test typechecks and production build pass; the worklet asset is included in renderer output. Tests cover 16/44.1/48 kHz conversion, mixing/clipping, tail flush, queue overflow, delayed permission, chunk ordering and turn ownership. Actual microphone/device behavior and live transcription remain unqualified. Next: B14 AssemblyAI v3 protocol and final-transcript handling.

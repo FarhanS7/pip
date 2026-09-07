@@ -14,6 +14,7 @@ import { Orchestrator } from './orchestrator'
 import { voiceStateMachine } from './state/voice-state-machine'
 import { conversationHistory } from './state/conversation'
 import { IpcChannel } from '../shared/channels'
+import * as settings from './state/settings'
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -37,9 +38,37 @@ beforeEach(() => {
   mocks.speak.mockResolvedValue(undefined)
   orchestrator = new Orchestrator()
 })
-afterEach(() => orchestrator.destroy())
+afterEach(() => { orchestrator.destroy(); vi.restoreAllMocks() })
 
 describe('Voice turn ownership', () => {
+  it('delivers ordered PCM and drains it before closing STT or capturing the screen', async () => {
+    vi.spyOn(settings, 'getSettings').mockReturnValue({ ...settings.getSettings(), selectedSTTProvider: 'assemblyai' })
+    const stt = session()
+    mocks.createSession.mockResolvedValue(stt)
+    begin()
+    const id = voiceStateMachine.getTurnId()
+    const buffer = new ArrayBuffer(3200)
+    await orchestrator.receiveAudio(id, 0, buffer)
+    expect(stt.sendAudio).toHaveBeenCalledExactlyOnceWith(buffer)
+    await expect(orchestrator.receiveAudio(id, 0, buffer)).rejects.toThrow('sequence')
+    process()
+    await Promise.resolve(); await Promise.resolve()
+    expect(stt.close).not.toHaveBeenCalled()
+    expect(mocks.capture).not.toHaveBeenCalled()
+    await orchestrator.receiveAudio(id, 1, buffer)
+    orchestrator.audioStopped(id)
+    await vi.waitFor(() => expect(stt.close).toHaveBeenCalledOnce())
+    await expect(orchestrator.receiveAudio(id, 2, buffer)).rejects.toThrow()
+  })
+
+  it('cancels empty microphone input instead of uploading a screen with a fallback prompt', async () => {
+    vi.spyOn(settings, 'getSettings').mockReturnValue({ ...settings.getSettings(), selectedSTTProvider: 'assemblyai' })
+    begin(); process()
+    orchestrator.audioStopped(voiceStateMachine.getTurnId())
+    await Promise.resolve()
+    expect(voiceStateMachine.getState()).toBe('idle')
+    expect(mocks.capture).not.toHaveBeenCalled()
+  })
   it('ignores renderer transcripts belonging to an older turn', async () => {
     begin()
     const oldId = voiceStateMachine.getTurnId()

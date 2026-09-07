@@ -12,6 +12,7 @@ import { mapToGlobalScreenCoordinates } from './state/coordinate-mapper'
 import { conversationHistory } from './state/conversation'
 import { IpcChannel } from './ipc/channels'
 import { createLogger } from './logger'
+import { waitForAudio } from './audio/wait-for-audio'
 
 const log = createLogger('orchestrator')
 interface Turn {
@@ -25,6 +26,11 @@ interface Turn {
   closing: Promise<void> | null
   tts: TTSProvider | null
   processing: boolean
+  audioDrain: Promise<void>
+  resolveAudioDrain: () => void
+  audioClosed: boolean
+  audioSequence: number
+  audioSamples: number
 }
 
 export class Orchestrator {
@@ -63,13 +69,42 @@ export class Orchestrator {
     this.releaseTurn()
     this.completedTts?.stop()
     this.completedTts = null
+    let resolveAudioDrain!: () => void
+    const audioDrain = new Promise<void>(resolve => { resolveAudioDrain = resolve })
     const turn: Turn = {
       id: voiceStateMachine.getTurnId(), controller: new AbortController(), settings: getSettings(),
       utterance: '', acceptingTranscript: true, ready: Promise.resolve(),
-      stt: null, closing: null, tts: null, processing: false
+      stt: null, closing: null, tts: null, processing: false,
+      audioDrain, resolveAudioDrain, audioClosed: false, audioSequence: 0, audioSamples: 0
     }
     this.turn = turn
     turn.ready = this.openStt(turn)
+  }
+
+  public async receiveAudio(turnId: number, sequence: number, buffer: ArrayBuffer): Promise<void> {
+    const turn = this.turn
+    if (!turn || turn.id !== turnId || turn.settings.selectedSTTProvider !== 'assemblyai') throw new Error('Inactive audio turn')
+    await waitForAudio(turn.ready, turn.controller.signal)
+    if (!this.owns(turn) || turn.audioClosed || turn.closing || !turn.stt || sequence !== turn.audioSequence) throw new Error('Invalid audio sequence or closed turn')
+    turn.stt.sendAudio(buffer)
+    turn.audioSequence++
+    turn.audioSamples += buffer.byteLength / 2
+    let squares = 0
+    const view = new DataView(buffer)
+    for (let offset = 0; offset < buffer.byteLength; offset += 2) squares += (view.getInt16(offset, true) / 32768) ** 2
+    this.broadcast(IpcChannel.AUDIO_POWER_LEVEL, { level: Math.min(1, Math.sqrt(squares / (buffer.byteLength / 2))) })
+  }
+
+  public audioStopped(turnId: number): void {
+    const turn = this.turn
+    if (!turn || turn.id !== turnId || turn.settings.selectedSTTProvider !== 'assemblyai') return
+    turn.audioClosed = true
+    turn.resolveAudioDrain()
+    if (!turn.audioSamples) this.cancel('no-microphone-audio')
+  }
+
+  public audioFailed(turnId: number): void {
+    if (this.turn?.id === turnId) this.cancel('microphone-failed')
   }
 
   private async openStt(turn: Turn): Promise<void> {
@@ -115,7 +150,9 @@ export class Orchestrator {
 
   private async processTurn(turn: Turn): Promise<void> {
     // A quick key release must wait for the session it started, not capture early.
-    await turn.ready
+    await waitForAudio(turn.ready, turn.controller.signal)
+    if (!this.owns(turn)) return
+    if (turn.settings.selectedSTTProvider === 'assemblyai') await waitForAudio(turn.audioDrain, turn.controller.signal)
     if (!this.owns(turn)) return
     await this.closeStt(turn)
     if (!this.owns(turn)) return

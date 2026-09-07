@@ -10,6 +10,9 @@ export type PointDetectedPayload = CursorPositionPayload
 export type TextChunkPayload = AIResponseChunkPayload
 
 export interface PipAPI {
+  sendAudio: (turnId: number, sequence: number, buffer: ArrayBuffer) => Promise<void>
+  audioStopped: (turnId: number) => Promise<void>
+  reportAudioFailure: (turnId: number) => Promise<void>
   updateTranscript: (text: string, turnId: number) => Promise<void>
   onSpeak: (callback: (payload: { requestId: number; text: string }) => void) => () => void
   onStopSpeaking: (callback: (payload: { requestId: number }) => void) => () => void

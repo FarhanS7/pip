@@ -33,6 +33,10 @@ describe('Renderer authority', () => {
     await expect(transcript(fixture('media').event, { text: 'bad shape' })).rejects.toThrow('Invalid transcript')
     await expect(transcript(fixture('media').event, 'x'.repeat(16001))).rejects.toThrow('Invalid transcript')
     await expect(transcript(fixture('media').event, { text: 'late', turnId: 1 })).rejects.toThrow('No active recording')
+    const audio = host.handlers.get(IpcChannel.MEDIA_AUDIO_CHUNK)!
+    expect(() => audio(fixture('overlay').event, {})).toThrow()
+    await expect(audio(fixture('media').event, { turnId: 1, sequence: 0, buffer: new ArrayBuffer(3202) })).rejects.toThrow('Invalid audio chunk')
+    await expect(audio(fixture('media').event, { turnId: 1, sequence: -1, buffer: new ArrayBuffer(2) })).rejects.toThrow('Invalid audio chunk')
   })
   it('limits media actions to the media renderer and keeps overlays read-only', () => {
     const panel = fixture('panel'), overlay = fixture('media')

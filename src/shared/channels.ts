@@ -30,6 +30,9 @@ export enum IpcChannel {
   TTS_SPEAK = 'tts:speak',
   TTS_STOP = 'tts:stop',
   MEDIA_READY = 'media:ready',
+  MEDIA_AUDIO_CHUNK = 'media:audio-chunk',
+  MEDIA_AUDIO_STOPPED = 'media:audio-stopped',
+  MEDIA_AUDIO_FAILED = 'media:audio-failed',
   MEDIA_PLAYBACK_RESULT = 'media:playback-result',
   /** Main → Renderer: Audio power level update (for waveform visualizer) */
   AUDIO_POWER_LEVEL = 'audio:power-level',
