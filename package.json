@@ -27,7 +27,8 @@
   },
   "dependencies": {
     "electron-store": "^10.0.0",
-    "uiohook-napi": "^1.5.5"
+    "uiohook-napi": "^1.5.5",
+    "ws": "8.21.0"
   },
   "devDependencies": {
     "@electron-toolkit/preload": "^3.0.1",
@@ -36,6 +37,7 @@
     "@types/node": "^22.20.1",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",

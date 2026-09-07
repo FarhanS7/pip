@@ -109,25 +109,29 @@ export class Orchestrator {
 
   private async openStt(turn: Turn): Promise<void> {
     try {
-      const session = await createSTTProvider(turn.settings.selectedSTTProvider).createSession()
+      const session = await createSTTProvider(turn.settings.selectedSTTProvider).createSession(turn.controller.signal)
       turn.stt = session
       if (!this.owns(turn)) { await this.closeStt(turn); return }
       session.onTranscript(event => {
         if (this.owns(turn) && turn.acceptingTranscript) turn.utterance = event.text
       })
       session.onError(error => {
-        if (this.owns(turn)) log.warn('STT session error', { turnId: turn.id, error: String(error) })
+        if (this.owns(turn)) {
+          log.warn('STT session error', { turnId: turn.id, error: String(error) })
+          this.cancel('stt-error')
+        }
       })
     } catch (error) {
-      if (this.owns(turn)) log.warn('STT unavailable for turn', { turnId: turn.id, error: String(error) })
+      if (this.owns(turn)) {
+        log.warn('STT unavailable for turn', { turnId: turn.id, error: String(error) })
+        this.cancel('stt-unavailable')
+      }
     }
   }
 
   private closeStt(turn: Turn): Promise<void> {
     if (!turn.stt) return Promise.resolve()
-    turn.closing ??= Promise.resolve().then(() => turn.stt!.close()).catch(error => {
-      log.warn('STT cleanup failed', { turnId: turn.id, error: String(error) })
-    })
+    turn.closing ??= Promise.resolve().then(() => turn.stt!.close())
     return turn.closing
   }
 
@@ -138,7 +142,7 @@ export class Orchestrator {
     turn.acceptingTranscript = false
     turn.controller.abort()
     try { turn.tts?.stop() } catch (error) { log.warn('TTS stop failed', { error: String(error) }) }
-    void this.closeStt(turn)
+    void this.closeStt(turn).catch(error => log.warn('STT cleanup failed', { turnId: turn.id, error: String(error) }))
   }
 
   public cancel(reason = 'user-cancelled'): void {
@@ -159,6 +163,9 @@ export class Orchestrator {
     turn.acceptingTranscript = false
 
     let displays: DisplayInfo[] = []
+    if (turn.settings.selectedSTTProvider === 'assemblyai' && !turn.utterance.trim()) {
+      this.cancel('no-transcript'); return
+    }
     let screenshotJpegBase64: string | undefined
     try {
       const screens = await captureAllScreens()

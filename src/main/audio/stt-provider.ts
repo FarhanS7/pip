@@ -24,7 +24,7 @@ export interface STTProvider {
   readonly displayName: string
   readonly requiresApiKey: boolean
   /** Create a new transcription session */
-  createSession(): Promise<STTSession>
+  createSession(signal?: AbortSignal): Promise<STTSession>
 }
 
 export type STTProviderType = 'assemblyai' | 'web-speech'

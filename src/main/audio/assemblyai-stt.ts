@@ -1,174 +1,145 @@
-/**
- * AssemblyAI Real-Time Streaming STT Provider (Task B.5)
- *
- * Implements STTProvider and STTSession for AssemblyAI WebSocket streaming.
- * Obtains temporary tokens via Cloudflare Worker proxy (/transcribe-token) with X-Pip-Auth.
- *
- * References:
- *   PHASE_0_ARCHITECTURE.md §0.1 (main/audio module)
- *   PHASE_1_MODULES_AND_TASKS.md Task B.5 scoped checklist
- */
-
-import { STTProvider, STTSession, STTTranscriptEvent } from './stt-provider'
+import type { STTProvider, STTSession, STTTranscriptEvent } from './stt-provider'
 import { STTError } from '../errors'
-import { createLogger } from '../logger'
+import WebSocket from 'ws'
+import { randomUUID } from 'node:crypto'
 
-const log = createLogger('assemblyai-stt')
+const failure = (code: string) => new STTError(code, 'Transcription could not complete. Please try again.')
 
+/** v3 lifecycle: Begin -> Turn revisions -> Terminate -> Termination. */
 export class AssemblyAISTTSession implements STTSession {
-  public readonly id: string
-  private ws: WebSocket | null = null
-  private transcriptCallbacks: Set<(event: STTTranscriptEvent) => void> = new Set()
-  private errorCallbacks: Set<(error: Error) => void> = new Set()
-  private isClosed: boolean = false
+  readonly id = `assemblyai-${randomUUID()}`
+  readonly ready: Promise<void>
+  private resolveReady!: () => void
+  private rejectReady!: (error: Error) => void
+  private begun = false
+  private closed = false
+  private error: Error | null = null
+  private closing: Promise<void> | null = null
+  private resolveClose?: () => void
+  private rejectClose?: (error: Error) => void
+  private timer: ReturnType<typeof setTimeout>
+  private turns = new Map<number, { text: string; final: boolean; formatted: boolean }>()
+  private transcripts = new Set<(event: STTTranscriptEvent) => void>()
+  private errors = new Set<(error: Error) => void>()
+  private abort = () => this.fail(failure('STT_CANCELLED'))
 
-  constructor(ws: WebSocket) {
-    this.id = `assemblyai-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`
-    this.ws = ws
-
-    this.ws.onmessage = (event) => {
-      if (this.isClosed) return
+  constructor(private ws: WebSocket, private signal?: AbortSignal) {
+    this.ready = new Promise((resolve, reject) => { this.resolveReady = resolve; this.rejectReady = reject })
+    this.timer = setTimeout(() => this.fail(failure('WS_CONNECT_TIMEOUT')), 10000)
+    ws.onmessage = event => {
+      if (this.closed) return
       try {
-        const data = JSON.parse(event.data.toString())
-        if (data.message_type === 'PartialTranscript' || data.type === 'PartialTranscript') {
-          const text = data.text || ''
-          if (text.trim()) {
-            this.emitTranscript(text.trim(), false)
+        const data: unknown = JSON.parse(String(event.data))
+        if (!data || typeof data !== 'object') throw new Error()
+        const message = data as Record<string, unknown>
+        if (message.type === 'Begin') {
+          this.begun = true; clearTimeout(this.timer); this.resolveReady()
+        } else if (message.type === 'Turn') {
+          if (!this.begun || !Number.isSafeInteger(message.turn_order) || (message.turn_order as number) < 0 ||
+              typeof message.transcript !== 'string' || typeof message.end_of_turn !== 'boolean') throw new Error()
+          const order = message.turn_order as number
+          const previous = this.turns.get(order)
+          if (previous?.final && !message.end_of_turn) return
+          if (previous?.formatted && !message.turn_is_formatted) return
+          this.turns.set(order, { text: message.transcript.trim(), final: message.end_of_turn, formatted: message.turn_is_formatted === true })
+          const segments = [...this.turns].sort(([a], [b]) => a - b).map(([, turn]) => turn)
+          const text = segments.map(turn => turn.text).filter(Boolean).join(' ')
+          if (text.length > 32000 || segments.length > 1000) throw new Error()
+          for (const callback of this.transcripts) callback({ text, isFinal: segments.every(turn => turn.final) })
+        } else if (message.type === 'Termination') {
+          if (!this.closing || [...this.turns.values()].some(turn => !turn.final)) {
+            this.fail(failure('STT_INCOMPLETE')); return
           }
-        } else if (data.message_type === 'FinalTranscript' || data.type === 'FinalTranscript' || data.text) {
-          const text = data.text || ''
-          if (text.trim()) {
-            this.emitTranscript(text.trim(), true)
-          }
-        }
-      } catch (err) {
-        log.warn('Failed to parse AssemblyAI WebSocket message', { error: String(err) })
-      }
+          this.resolveClose?.(); this.cleanup()
+        } else if (message.type === 'Error' || message.error) this.fail(failure('STT_PROVIDER_ERROR'))
+      } catch { this.fail(failure('STT_PROTOCOL_ERROR')) }
     }
-
-    this.ws.onerror = (event) => {
-      log.error('AssemblyAI WebSocket error', { event })
-      this.emitError(new STTError('ASSEMBLYAI_WS_ERROR', 'AssemblyAI WebSocket encountered an error'))
-    }
-
-    this.ws.onclose = (event) => {
-      log.info('AssemblyAI WebSocket closed', { code: event.code, reason: event.reason })
-    }
+    ws.onerror = () => this.fail(failure('ASSEMBLYAI_WS_ERROR'))
+    ws.onclose = () => this.fail(failure('STT_UNEXPECTED_CLOSE'))
+    signal?.addEventListener('abort', this.abort, { once: true })
+    if (signal?.aborted) this.abort()
   }
 
-  public sendAudio(chunk: ArrayBuffer): void {
-    if (this.isClosed || !this.ws || this.ws.readyState !== 1 /* OPEN */) {
-      throw new STTError('STT_SESSION_CLOSED', 'Cannot send audio to a closed transcription session')
-    }
-    if (this.ws.bufferedAmount > 160000) throw new STTError('STT_BACKPRESSURE', 'Transcription connection is too slow')
-    this.ws.send(chunk)
+  sendAudio(chunk: ArrayBuffer): void {
+    if (!this.begun || this.closed || this.closing || this.ws.readyState !== 1) throw failure('STT_SESSION_CLOSED')
+    if (chunk.byteLength < 2 || chunk.byteLength > 3200 || chunk.byteLength % 2) throw failure('STT_INVALID_AUDIO')
+    if (this.ws.bufferedAmount > 160000) throw failure('STT_BACKPRESSURE')
+    // The final worklet tail may be shorter than the API's 50 ms minimum.
+    if (chunk.byteLength < 1600) {
+      const padded = new Uint8Array(1600); padded.set(new Uint8Array(chunk)); this.ws.send(padded)
+    } else this.ws.send(chunk)
   }
 
-  public onTranscript(callback: (event: STTTranscriptEvent) => void): void {
-    this.transcriptCallbacks.add(callback)
+  onTranscript(callback: (event: STTTranscriptEvent) => void): void { this.transcripts.add(callback) }
+  onError(callback: (error: Error) => void): void {
+    if (this.error) callback(this.error)
+    else this.errors.add(callback)
   }
 
-  public onError(callback: (error: Error) => void): void {
-    this.errorCallbacks.add(callback)
+  close(): Promise<void> {
+    if (this.closing) return this.closing
+    if (this.closed) return this.error ? Promise.reject(this.error) : Promise.resolve()
+    this.closing = new Promise((resolve, reject) => { this.resolveClose = resolve; this.rejectClose = reject })
+    clearTimeout(this.timer)
+    this.timer = setTimeout(() => this.fail(failure('STT_FINALIZATION_TIMEOUT')), 10000)
+    try { this.ws.send(JSON.stringify({ type: 'Terminate' })) }
+    catch { this.fail(failure('STT_TERMINATE_FAILED')) }
+    return this.closing
   }
 
-  private emitTranscript(text: string, isFinal: boolean): void {
-    for (const callback of this.transcriptCallbacks) {
-      try {
-        callback({ text, isFinal })
-      } catch (err) {
-        log.error('Transcript callback error', { error: String(err) })
-      }
-    }
+  private fail(error: Error): void {
+    if (this.closed) return
+    this.error = error
+    this.rejectReady(error); this.rejectClose?.(error)
+    const callbacks = [...this.errors]
+    this.cleanup()
+    for (const callback of callbacks) callback(error)
   }
 
-  private emitError(error: Error): void {
-    for (const callback of this.errorCallbacks) {
-      try {
-        callback(error)
-      } catch (err) {
-        log.error('Error callback error', { error: String(err) })
-      }
-    }
-  }
-
-  public async close(): Promise<void> {
-    if (this.isClosed) return
-    this.isClosed = true
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
-    }
-    this.transcriptCallbacks.clear()
-    this.errorCallbacks.clear()
-    log.info('AssemblyAISTTSession closed', { sessionId: this.id })
+  private cleanup(): void {
+    this.closed = true; clearTimeout(this.timer)
+    this.signal?.removeEventListener('abort', this.abort)
+    this.ws.onmessage = null; this.ws.onerror = () => {}; this.ws.onclose = null
+    try {
+      // Cancellation also tells the provider to stop billing before local close.
+      if (!this.closing && this.ws.readyState === 1) this.ws.send(JSON.stringify({ type: 'Terminate' }))
+      if (this.error) this.ws.terminate()
+      else this.ws.close()
+    } catch { /* Already disconnected. */ }
+    this.transcripts.clear(); this.errors.clear(); this.turns.clear()
   }
 }
 
 export class AssemblyAISTTProvider implements STTProvider {
-  public readonly name = 'assemblyai'
-  public readonly displayName = 'AssemblyAI Real-Time STT'
-  public readonly requiresApiKey = true
-
-  private readonly workerUrl: string
-  private readonly sharedSecret: string
-
+  readonly name = 'assemblyai'
+  readonly displayName = 'AssemblyAI Real-Time STT'
+  readonly requiresApiKey = true
   constructor(
-    workerUrl: string = process.env.PIP_WORKER_URL || 'http://127.0.0.1:8787',
-    sharedSecret: string = process.env.PIP_SHARED_SECRET || 'your-shared-secret-placeholder'
-  ) {
-    this.workerUrl = workerUrl
-    this.sharedSecret = sharedSecret
-  }
+    private workerUrl = process.env.PIP_WORKER_URL || 'http://127.0.0.1:8787',
+    private sharedSecret = process.env.PIP_SHARED_SECRET || ''
+  ) {}
 
-  public async createSession(): Promise<STTSession> {
-    log.info('Creating AssemblyAI STT session via Worker token')
-
-    let response: Response
+  async createSession(signal?: AbortSignal): Promise<STTSession> {
+    signal?.throwIfAborted()
+    const controller = new AbortController()
+    const abort = () => controller.abort()
+    signal?.addEventListener('abort', abort, { once: true })
+    const timer = setTimeout(abort, 10000)
+    let token: string
     try {
-      response = await fetch(`${this.workerUrl}/transcribe-token`, {
-        method: 'GET',
-        headers: {
-          'X-Pip-Auth': this.sharedSecret
-        }
+      const response = await fetch(`${this.workerUrl}/transcribe-token`, {
+        method: 'GET', headers: { 'X-Pip-Auth': this.sharedSecret }, signal: controller.signal
       })
-    } catch (err) {
-      log.error('Failed to fetch transcribe token from Worker', { error: String(err) })
-      throw new STTError('TOKEN_FETCH_FAILED', `Failed to fetch AssemblyAI token: ${String(err)}`)
-    }
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new STTError('TOKEN_FETCH_HTTP_ERROR', `Worker returned HTTP ${response.status}: ${errorText}`)
-    }
-
-    const tokenData = await response.json()
-    const token = tokenData.token || tokenData.temp_token
-
-    if (!token) {
-      throw new STTError('INVALID_TOKEN_RESPONSE', 'Worker returned response without token')
-    }
-
-    const wsUrl = `wss://streaming.assemblyai.com/v3/ws?token=${token}&sample_rate=16000`
-    const ws = new WebSocket(wsUrl)
-
-    await new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        reject(new STTError('WS_CONNECT_TIMEOUT', 'AssemblyAI WebSocket connection timed out'))
-      }, 10000)
-
-      ws.onopen = () => {
-        clearTimeout(timeout)
-        log.info('AssemblyAI WebSocket connection established')
-        resolve()
-      }
-
-      ws.onerror = (err) => {
-        clearTimeout(timeout)
-        reject(new STTError('WS_CONNECT_FAILED', `AssemblyAI WebSocket connect failed: ${String(err)}`))
-      }
-    })
-
-    return new AssemblyAISTTSession(ws)
+      if (!response.ok) throw failure('TOKEN_FETCH_HTTP_ERROR')
+      const data: unknown = await response.json()
+      if (!data || typeof data !== 'object' || !('token' in data) || typeof data.token !== 'string' || !data.token.trim() || data.token.length > 8192) throw failure('INVALID_TOKEN_RESPONSE')
+      token = data.token
+    } catch { throw failure('TOKEN_FETCH_FAILED') }
+    finally { clearTimeout(timer); signal?.removeEventListener('abort', abort) }
+    signal?.throwIfAborted()
+    const query = new URLSearchParams({ token, sample_rate: '16000', encoding: 'pcm_s16le' })
+    const session = new AssemblyAISTTSession(new WebSocket(`wss://streaming.assemblyai.com/v3/ws?${query}`), signal)
+    await session.ready
+    return session
   }
 }

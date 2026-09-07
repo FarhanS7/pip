@@ -70,3 +70,7 @@ B12 single hidden media renderer, readiness/playback acknowledgements, browser a
 ## B13 execution update
 
 B13 microphone capture, mono 16 kHz PCM16 worklet conversion, bounded serial transport and stop/drain acknowledgement are implemented; local checks passed; independent review pending. Full suite: 94 tests / 18 files. Lint, app/Worker/test typechecks and production build pass; the worklet asset is included in renderer output. Tests cover 16/44.1/48 kHz conversion, mixing/clipping, tail flush, queue overflow, delayed permission, chunk ordering and turn ownership. Actual microphone/device behavior and live transcription remain unqualified. Next: B14 AssemblyAI v3 protocol and final-transcript handling.
+
+## B14 execution update
+
+B14 AssemblyAI v3 Begin/Turn/Termination handling, transcript revision aggregation, bounded startup/finalization and cancellation are implemented; local checks passed; independent review pending. Stop keeps accepting final transcripts until Termination. STT failure or an empty AssemblyAI transcript cancels before screenshot/AI requests. Added an explicit ws runtime dependency. Full suite: 109 tests / 19 files, including a real loopback WebSocket exchange; lint, app/Worker/test typechecks and production build pass. No live provider/device certification is claimed. B05 Worker validation and B31 token/session spend controls remain open dependencies for release. Next: B15 browser STT capability handling and typed fallback.

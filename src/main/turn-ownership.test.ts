@@ -41,6 +41,47 @@ beforeEach(() => {
 afterEach(() => { orchestrator.destroy(); vi.restoreAllMocks() })
 
 describe('Voice turn ownership', () => {
+  it('uses the final transcript received while STT is closing', async () => {
+    vi.spyOn(settings, 'getSettings').mockReturnValue({ ...settings.getSettings(), selectedSTTProvider: 'assemblyai' })
+    const stt = session()
+    let transcript!: Parameters<STTSession['onTranscript']>[0]
+    vi.mocked(stt.onTranscript).mockImplementation(callback => { transcript = callback })
+    const finalized = deferred<void>()
+    vi.mocked(stt.close).mockReturnValue(finalized.promise)
+    mocks.createSession.mockResolvedValue(stt)
+    begin()
+    const id = voiceStateMachine.getTurnId()
+    await orchestrator.receiveAudio(id, 0, new ArrayBuffer(3200))
+    transcript({ text: 'partial', isFinal: false })
+    process(); orchestrator.audioStopped(id)
+    await vi.waitFor(() => expect(stt.close).toHaveBeenCalledOnce())
+    expect(mocks.capture).not.toHaveBeenCalled()
+    transcript({ text: 'complete request', isFinal: true }); finalized.resolve()
+    await vi.waitFor(() => expect(mocks.stream).toHaveBeenCalledOnce())
+    expect((mocks.stream.mock.calls[0][0] as VisionPromptPayload).messages.at(-1)?.content).toBe('complete request')
+  })
+
+  it('does not capture or call AI if STT finalization fails', async () => {
+    vi.spyOn(settings, 'getSettings').mockReturnValue({ ...settings.getSettings(), selectedSTTProvider: 'assemblyai' })
+    const stt = session()
+    vi.mocked(stt.close).mockRejectedValue(new Error('finalization failed'))
+    mocks.createSession.mockResolvedValue(stt)
+    begin()
+    const id = voiceStateMachine.getTurnId()
+    await orchestrator.receiveAudio(id, 0, new ArrayBuffer(3200))
+    process(); orchestrator.audioStopped(id)
+    await vi.waitFor(() => expect(voiceStateMachine.getState()).toBe('idle'))
+    expect(mocks.capture).not.toHaveBeenCalled(); expect(mocks.stream).not.toHaveBeenCalled()
+  })
+
+  it('cancels failed STT startup and forwards the turn cancellation signal', async () => {
+    mocks.createSession.mockRejectedValue(new Error('unavailable'))
+    begin()
+    await vi.waitFor(() => expect(voiceStateMachine.getState()).toBe('idle'))
+    expect(mocks.createSession.mock.calls[0][0].aborted).toBe(true)
+    expect(mocks.capture).not.toHaveBeenCalled()
+  })
+
   it('delivers ordered PCM and drains it before closing STT or capturing the screen', async () => {
     vi.spyOn(settings, 'getSettings').mockReturnValue({ ...settings.getSettings(), selectedSTTProvider: 'assemblyai' })
     const stt = session()
