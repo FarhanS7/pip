@@ -78,3 +78,7 @@ B14 AssemblyAI v3 Begin/Turn/Termination handling, transcript revision aggregati
 ## B15 execution update
 
 Implemented panel typed requests without microphone/STT startup, panel-only bounded input IPC, browser capability/failure handling, and final browser result acknowledgement after Stop. Empty speech no longer produces a fabricated screenshot prompt. Checks: 116 tests / 20 files, typechecks and build pass; lint passed before the final null guard/security fixture additions. Native recognition availability and panel usability qualification remain pending. Next: B16 paid TTS media transport.
+
+## B16 execution update
+
+Paid TTS now fetches bounded audio in main and plays it in the single media renderer with end/error acknowledgements, cancellation and URL cleanup. Main no longer creates DOM audio elements or silently reports successful playback without audio. Full suite: 125 tests / 21 files; lint, typechecks and production build pass. The final OpenAI input-field correction passed the 10 focused transport/playback tests. Strict no-DOM boundary typecheck now passes. Live provider/audible playback and independent review remain pending.

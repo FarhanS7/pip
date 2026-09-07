@@ -12,7 +12,7 @@ import { IpcChannel } from '../channels'
 
 /** Main-to-renderer event contracts, shared by senders and the preload bridge. */
 export interface IpcEventPayloads {
-  [IpcChannel.TTS_SPEAK]: { requestId: number; text: string }
+  [IpcChannel.TTS_SPEAK]: { requestId: number; text: string; audio?: ArrayBuffer }
   [IpcChannel.TTS_STOP]: { requestId: number }
   [IpcChannel.VOICE_STATE_CHANGED]: VoiceStateChangedPayload
   [IpcChannel.AUDIO_POWER_LEVEL]: AudioPowerLevelPayload

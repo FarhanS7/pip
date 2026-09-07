@@ -16,7 +16,7 @@ export interface PipAPI {
   audioStopped: (turnId: number) => Promise<void>
   reportAudioFailure: (turnId: number) => Promise<void>
   updateTranscript: (text: string, turnId: number) => Promise<void>
-  onSpeak: (callback: (payload: { requestId: number; text: string }) => void) => () => void
+  onSpeak: (callback: (payload: { requestId: number; text: string; audio?: ArrayBuffer }) => void) => () => void
   onStopSpeaking: (callback: (payload: { requestId: number }) => void) => () => void
   mediaReady: () => Promise<void>
   reportPlayback: (requestId: number, status: 'ended' | 'error') => Promise<void>

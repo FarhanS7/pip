@@ -1,4 +1,4 @@
-export interface SpeechRequest { requestId: number; text: string }
+export interface SpeechRequest { requestId: number; text: string; audio?: ArrayBuffer }
 export interface PlaybackResult { requestId: number; status: 'ended' | 'error' }
 
 /** Single playback owner. Transport readiness and completion are independent. */
@@ -32,7 +32,7 @@ export class PlaybackController {
       signal?.addEventListener('abort', abort, { once: true })
     })
   }
-  async speak(text: string, signal?: AbortSignal): Promise<void> {
+  async speak(text: string, signal?: AbortSignal, audio?: ArrayBuffer): Promise<void> {
     const id = ++this.sequence
     this.stopActive()
     await this.awaitReady(signal)
@@ -49,7 +49,7 @@ export class PlaybackController {
       const timer = setTimeout(() => { this.sendStop(id); finish(new Error('Playback timed out')) }, 180000)
       this.pending = { id, finish }
       signal?.addEventListener('abort', abort, { once: true })
-      try { this.send('speak', { requestId: id, text }) } catch { finish(new Error('Media renderer unavailable')) }
+      try { this.send('speak', { requestId: id, text, ...(audio ? { audio } : {}) }) } catch { finish(new Error('Media renderer unavailable')) }
     })
   }
   complete(result: PlaybackResult): void {
