@@ -82,3 +82,7 @@ Implemented panel typed requests without microphone/STT startup, panel-only boun
 ## B16 execution update
 
 Paid TTS now fetches bounded audio in main and plays it in the single media renderer with end/error acknowledgements, cancellation and URL cleanup. Main no longer creates DOM audio elements or silently reports successful playback without audio. Full suite: 125 tests / 21 files; lint, typechecks and production build pass. The final OpenAI input-field correction passed the 10 focused transport/playback tests. Strict no-DOM boundary typecheck now passes. Live provider/audible playback and independent review remain pending.
+
+## B02 boundary gate follow-up
+
+After B16 removed the remaining main-process DOM audio use, npm run typecheck:boundaries passes. Windows CI now runs this check as a required job step. Earlier boundary-failure notes are historical evidence, not the current result. Generated Worker environment types and native/toolchain qualification remain separate work. No hosted result is claimed until the new CI run is observed.

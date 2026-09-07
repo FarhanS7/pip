@@ -31,6 +31,7 @@ jobs:
       - run: npm ci --prefix worker
       - run: npm run lint
       - run: npm run typecheck
+      - run: npm run typecheck:boundaries
       - run: npm test
       - run: npm run test:integration
       - run: npm run build

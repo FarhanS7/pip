@@ -127,3 +127,7 @@ OpenAI and ElevenLabs now share a main-process proxy transport: request cancella
 The OpenAI adapter sends input (not text), explicitly requests MP3 and enforces its 4096-character input limit; ElevenLabs retains text. Existing provider/model/voice choices were preserved. Source: [OpenAI speech reference](https://developers.openai.com/api/reference/cli/resources/audio/subresources/speech/methods/create). No credentials or live provider calls were used.
 
 Evidence: 125 tests across 21 files, lint, app/Worker/test types and production build passed. After the final request-shape correction, the 10 focused transport/playback tests and strict no-DOM boundary audit passed. Tests cover both adapters, acknowledgement waits, stop, timeout, invalid MIME, empty/oversized audio, blob cleanup and stale callbacks. Native decoding, audible output, device removal and live provider qualification remain open; buffering is bounded but not incremental playback. B05 still owns server enforcement. Independent review remains pending. Rollback: revert B16 with Pip stopped; no storage migration.
+
+## B02 follow-up: enforce process boundaries
+
+Enabled the existing strict no-DOM typecheck in the Windows verification workflow after it passed locally with B16. No suppressions or widened DOM libraries were added. This prevents reintroducing browser-only audio APIs into main/preload. Hosted CI and independent review remain pending; reverting this one-line CI addition is the rollback if the runner reveals a toolchain issue, while retaining the audio fixes.
