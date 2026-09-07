@@ -74,3 +74,7 @@ B13 microphone capture, mono 16 kHz PCM16 worklet conversion, bounded serial tra
 ## B14 execution update
 
 B14 AssemblyAI v3 Begin/Turn/Termination handling, transcript revision aggregation, bounded startup/finalization and cancellation are implemented; local checks passed; independent review pending. Stop keeps accepting final transcripts until Termination. STT failure or an empty AssemblyAI transcript cancels before screenshot/AI requests. Added an explicit ws runtime dependency. Full suite: 109 tests / 19 files, including a real loopback WebSocket exchange; lint, app/Worker/test typechecks and production build pass. No live provider/device certification is claimed. B05 Worker validation and B31 token/session spend controls remain open dependencies for release. Next: B15 browser STT capability handling and typed fallback.
+
+## B15 execution update
+
+Implemented panel typed requests without microphone/STT startup, panel-only bounded input IPC, browser capability/failure handling, and final browser result acknowledgement after Stop. Empty speech no longer produces a fabricated screenshot prompt. Checks: 116 tests / 20 files, typechecks and build pass; lint passed before the final null guard/security fixture additions. Native recognition availability and panel usability qualification remain pending. Next: B16 paid TTS media transport.

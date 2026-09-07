@@ -30,7 +30,7 @@ export class VoiceStateMachine {
    * Maps current state to array of valid next states.
    */
   private readonly allowedTransitions: Record<VoiceState, VoiceState[]> = {
-    idle: ['listening'],
+    idle: ['listening', 'processing'],
     listening: ['processing', 'idle'],
     processing: ['responding', 'listening', 'idle'],
     responding: ['listening', 'idle']
@@ -70,7 +70,7 @@ export class VoiceStateMachine {
 
     const previousState = this.currentState
     this.currentState = nextState
-    if (nextState === 'listening') this.turnId++
+    if (nextState === 'listening' || (previousState === 'idle' && nextState === 'processing')) this.turnId++
 
     log.info('Voice state changed', { from: previousState, to: nextState, reason })
 

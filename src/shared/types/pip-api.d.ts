@@ -10,6 +10,8 @@ export type PointDetectedPayload = CursorPositionPayload
 export type TextChunkPayload = AIResponseChunkPayload
 
 export interface PipAPI {
+  submitText: (text: string) => Promise<void>
+  finishBrowserRecognition: (text: string, turnId: number) => Promise<void>
   sendAudio: (turnId: number, sequence: number, buffer: ArrayBuffer) => Promise<void>
   audioStopped: (turnId: number) => Promise<void>
   reportAudioFailure: (turnId: number) => Promise<void>

@@ -22,6 +22,17 @@ const log = createLogger('ipc')
  */
 export function registerIpcHandlers(): void {
   log.info('Registering IPC handlers')
+  handle(IpcChannel.SUBMIT_TEXT, async (_event, text) => {
+    if (typeof text !== 'string' || !text.trim() || text.length > 16000) throw new Error('Enter a request of 1 to 16000 characters')
+    const { initOrchestrator } = await import('../orchestrator')
+    initOrchestrator().submitText(text)
+  })
+  handle(IpcChannel.BROWSER_TRANSCRIPT_FINAL, async (_event, payload) => {
+    if (!payload || typeof payload !== 'object' || !('text' in payload) || !('turnId' in payload) ||
+        typeof payload.text !== 'string' || payload.text.length > 16000 || typeof payload.turnId !== 'number' || !Number.isSafeInteger(payload.turnId)) throw new Error('Invalid browser transcript')
+    const { initOrchestrator } = await import('../orchestrator')
+    initOrchestrator().finishBrowserRecognition(payload.text, payload.turnId)
+  })
   handle(IpcChannel.MEDIA_AUDIO_CHUNK, async (_event, payload) => {
     if (!payload || typeof payload !== 'object' || !('turnId' in payload) || !('sequence' in payload) || !('buffer' in payload) ||
       typeof payload.turnId !== 'number' || !Number.isSafeInteger(payload.turnId) ||

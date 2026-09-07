@@ -34,6 +34,11 @@ describe('Renderer authority', () => {
     await expect(transcript(fixture('media').event, 'x'.repeat(16001))).rejects.toThrow('Invalid transcript')
     await expect(transcript(fixture('media').event, { text: 'late', turnId: 1 })).rejects.toThrow('No active recording')
     const audio = host.handlers.get(IpcChannel.MEDIA_AUDIO_CHUNK)!
+    const text = host.handlers.get(IpcChannel.SUBMIT_TEXT)!
+    expect(() => text(fixture('media').event, 'request')).toThrow()
+    await expect(text(fixture('panel').event, ' ')).rejects.toThrow()
+    await expect(text(fixture('panel').event, 'x'.repeat(16001))).rejects.toThrow()
+    expect(() => authorizeIpc(fixture('panel').event, IpcChannel.BROWSER_TRANSCRIPT_FINAL)).toThrow()
     expect(() => audio(fixture('overlay').event, {})).toThrow()
     await expect(audio(fixture('media').event, { turnId: 1, sequence: 0, buffer: new ArrayBuffer(3202) })).rejects.toThrow('Invalid audio chunk')
     await expect(audio(fixture('media').event, { turnId: 1, sequence: -1, buffer: new ArrayBuffer(2) })).rejects.toThrow('Invalid audio chunk')

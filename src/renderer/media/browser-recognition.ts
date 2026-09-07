@@ -6,7 +6,9 @@ interface Recognition {
   lang: string
   onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null
   onerror: (() => void) | null
+  onend: (() => void) | null
   start(): void
+  stop(): void
   abort(): void
 }
 type RecognitionWindow = Window & {
@@ -14,37 +16,54 @@ type RecognitionWindow = Window & {
   webkitSpeechRecognition?: new () => Recognition
 }
 
-/** Transitional browser adapter; PCM capture/provider finalization are B13-B15. */
 export function bindBrowserRecognition(api: PipAPI): () => void {
   let generation = 0
-  let recognition: Recognition | null = null
-  const stop = () => {
-    if (recognition) {
-      recognition.onresult = null; recognition.onerror = null
-      try { recognition.abort() } catch { /* Already stopped. */ }
-      recognition = null
-    }
+  let active: { id: number; session: Recognition; text: string; stopping: boolean } | null = null
+  const discard = () => {
+    if (!active) return
+    const { session } = active
+    active = null
+    session.onresult = null; session.onerror = null; session.onend = null
+    try { session.abort() } catch { /* Already stopped. */ }
   }
   const unsubscribe = api.onVoiceStateChanged(({ state, turnId }) => {
+    if (state === 'processing' && active && active.id === turnId) {
+      if (!active.stopping) {
+        active.stopping = true
+        try { active.session.stop() } catch { void api.reportAudioFailure(active.id).catch(() => {}); discard() }
+      }
+      return
+    }
     const current = ++generation
-    stop()
+    discard()
     if (state !== 'listening' || turnId === undefined) return
     void api.getSettings().then(settings => {
       if (current !== generation || settings.selectedSTTProvider !== 'web-speech') return
       const host = window as RecognitionWindow
       const Constructor = host.SpeechRecognition ?? host.webkitSpeechRecognition
-      if (!Constructor) { console.warn('Browser speech recognition is unavailable'); return }
+      if (!Constructor) { void api.reportAudioFailure(turnId).catch(() => {}); return }
       const session = new Constructor()
-      recognition = session
+      const owner = { id: turnId, session, text: '', stopping: false }
+      active = owner
       session.continuous = true; session.interimResults = true; session.lang = 'en-US'
       session.onresult = event => {
-        if (current !== generation) return
-        const text = Array.from(event.results).map(result => result[0]?.transcript ?? '').join('')
-        if (text.trim()) void api.updateTranscript(text, turnId).catch(() => {})
+        if (active !== owner) return
+        owner.text = Array.from(event.results).map(result => result[0]?.transcript ?? '').join(' ').trim()
       }
-      session.onerror = () => console.warn('Browser speech recognition failed')
+      session.onend = () => {
+        if (active !== owner) return
+        const text = owner.text
+        discard()
+        void api.finishBrowserRecognition(text, turnId).catch(() => { void api.reportAudioFailure(turnId).catch(() => {}) })
+      }
+      session.onerror = () => {
+        if (active !== owner) return
+        discard(); void api.reportAudioFailure(turnId).catch(() => {})
+      }
       session.start()
-    }).catch(() => { if (current === generation) stop() })
+    }).catch(() => {
+      if (current === generation) { discard(); void api.reportAudioFailure(turnId).catch(() => {}) }
+    })
   })
-  return () => { generation++; unsubscribe(); stop() }
+  return () => { generation++; unsubscribe(); discard() }
 }

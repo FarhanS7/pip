@@ -115,6 +115,7 @@ describe('Central Orchestrator Pipeline', () => {
 
     // 2. Transition to processing
     voiceStateMachine.transitionTo('processing', 'hotkey-release')
+    initOrchestrator().finishBrowserRecognition('Where is the submit button?', voiceStateMachine.getTurnId())
 
     // Wait for async processing pipeline to complete
     await new Promise((resolve) => setTimeout(resolve, 100))
@@ -151,6 +152,7 @@ describe('Central Orchestrator Pipeline', () => {
       initOrchestrator()
       voiceStateMachine.transitionTo('listening', 'bridge-test')
       voiceStateMachine.transitionTo('processing', 'bridge-test')
+      initOrchestrator().finishBrowserRecognition('Where is the submit button?', voiceStateMachine.getTurnId())
       await vi.waitFor(() => expect(sink.setPoint).toHaveBeenCalledWith({
         x: 100, y: 200, label: 'submit button', screenIndex: 0
       }))

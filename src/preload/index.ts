@@ -22,6 +22,8 @@ function subscribe<C extends keyof IpcEventPayloads>(
 }
 
 const pipAPI: PipAPI = {
+  submitText: text => ipcRenderer.invoke(IpcChannel.SUBMIT_TEXT, text),
+  finishBrowserRecognition: (text, turnId) => ipcRenderer.invoke(IpcChannel.BROWSER_TRANSCRIPT_FINAL, { text, turnId }),
   sendAudio: (turnId, sequence, buffer) => ipcRenderer.invoke(IpcChannel.MEDIA_AUDIO_CHUNK, { turnId, sequence, buffer }),
   audioStopped: (turnId) => ipcRenderer.invoke(IpcChannel.MEDIA_AUDIO_STOPPED, turnId),
   reportAudioFailure: (turnId) => ipcRenderer.invoke(IpcChannel.MEDIA_AUDIO_FAILED, turnId),

@@ -23,6 +23,9 @@ function App(): React.JSX.Element {
   const [voiceState, setVoiceState] = useState<'idle' | 'listening' | 'processing' | 'responding'>('idle')
   const [settings, setSettings] = useState<SettingsPayload>(DEFAULT_SETTINGS)
   const [settingsError, setSettingsError] = useState<string | null>(null)
+  const [request, setRequest] = useState('')
+  const [inputError, setInputError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     if (!window.pipAPI) return
@@ -41,6 +44,9 @@ function App(): React.JSX.Element {
 
     const unsubVoice = window.pipAPI.onVoiceStateChanged((payload) => {
       setVoiceState(payload.state)
+      if (payload.state === 'idle' && ['microphone-failed', 'stt-error', 'stt-unavailable', 'no-transcript', 'turn-error'].includes(payload.reason ?? '')) {
+        setInputError('The request could not complete. You can type your request below or check your speech provider and try again.')
+      }
     })
 
     const unsubSettings = window.pipAPI.onSettingsChanged((newSettings) => {
@@ -92,6 +98,22 @@ function App(): React.JSX.Element {
 
       {/* Manual Voice Trigger Button */}
       <VoiceToggleButton voiceState={voiceState} onToggle={handleToggleVoice} />
+
+      <form onSubmit={async event => {
+        event.preventDefault()
+        if (!window.pipAPI || submitting) return
+        setSubmitting(true); setInputError(null)
+        try { await window.pipAPI.submitText(request); setRequest('') }
+        catch { setInputError('Request was not sent. Finish the current request or try again.') }
+        finally { setSubmitting(false) }
+      }}>
+        <label htmlFor="typed-request">Type a request</label>
+        <textarea id="typed-request" value={request} maxLength={16000} rows={3}
+          onChange={event => setRequest(event.target.value)} placeholder="What would you like help with?" />
+        <p>Pip will include your screen with this request. Typed input does not use your microphone.</p>
+        <button type="submit" disabled={voiceState !== 'idle' || submitting || !request.trim()}>Send request with screen</button>
+        {inputError && <p role="alert">{inputError}</p>}
+      </form>
 
       {/* Model Provider Selectors */}
       <ProviderSelectors settings={settings} onUpdateSetting={handleUpdateSetting} />

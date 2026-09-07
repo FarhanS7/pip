@@ -16,6 +16,7 @@ import { waitForAudio } from './audio/wait-for-audio'
 
 const log = createLogger('orchestrator')
 interface Turn {
+  typed: boolean
   id: number
   controller: AbortController
   settings: SettingsPayload
@@ -37,12 +38,15 @@ export class Orchestrator {
   private turn: Turn | null = null
   private unsubscribeState: (() => void) | null
   private completedTts: TTSProvider | null = null
+  private pendingText: string | null = null
 
   constructor() {
     this.unsubscribeState = voiceStateMachine.onStateChange(state => {
       if (state === 'listening') this.beginTurn()
       else if (state === 'idle') this.releaseTurn()
-      else if (state === 'processing' && this.turn && !this.turn.processing) {
+      else if (state === 'processing') {
+        if (!this.turn && this.pendingText !== null) this.beginTurn(this.pendingText)
+        if (!this.turn || this.turn.processing) return
         const turn = this.turn
         turn.processing = true
         void this.processTurn(turn).catch(error => {
@@ -65,7 +69,25 @@ export class Orchestrator {
     }
   }
 
-  private beginTurn(): void {
+  public submitText(text: string): void {
+    if (typeof text !== 'string' || !text.trim() || text.length > 16000) throw new Error('Invalid request')
+    if (voiceStateMachine.getState() !== 'idle') throw new Error('Finish or cancel the current request first')
+    this.pendingText = text.trim()
+    try { voiceStateMachine.transitionTo('processing', 'typed-input') }
+    finally { this.pendingText = null }
+  }
+
+  public finishBrowserRecognition(text: string, turnId: number): void {
+    const turn = this.turn
+    if (!turn || !this.owns(turn) || turn.id !== turnId || turn.typed || turn.audioClosed || turn.settings.selectedSTTProvider !== 'web-speech') return
+    turn.utterance = text.trim()
+    turn.audioClosed = true
+    turn.resolveAudioDrain()
+    if (!turn.utterance) this.cancel('no-transcript')
+    else if (voiceStateMachine.getState() === 'listening') voiceStateMachine.transitionTo('processing', 'browser-speech-ended')
+  }
+
+  private beginTurn(text?: string): void {
     this.releaseTurn()
     this.completedTts?.stop()
     this.completedTts = null
@@ -73,12 +95,12 @@ export class Orchestrator {
     const audioDrain = new Promise<void>(resolve => { resolveAudioDrain = resolve })
     const turn: Turn = {
       id: voiceStateMachine.getTurnId(), controller: new AbortController(), settings: getSettings(),
-      utterance: '', acceptingTranscript: true, ready: Promise.resolve(),
+      typed: text !== undefined, utterance: text ?? '', acceptingTranscript: text === undefined, ready: Promise.resolve(),
       stt: null, closing: null, tts: null, processing: false,
       audioDrain, resolveAudioDrain, audioClosed: false, audioSequence: 0, audioSamples: 0
     }
     this.turn = turn
-    turn.ready = this.openStt(turn)
+    if (!turn.typed) turn.ready = this.openStt(turn)
   }
 
   public async receiveAudio(turnId: number, sequence: number, buffer: ArrayBuffer): Promise<void> {
@@ -156,14 +178,14 @@ export class Orchestrator {
     // A quick key release must wait for the session it started, not capture early.
     await waitForAudio(turn.ready, turn.controller.signal)
     if (!this.owns(turn)) return
-    if (turn.settings.selectedSTTProvider === 'assemblyai') await waitForAudio(turn.audioDrain, turn.controller.signal)
+    if (!turn.typed) await waitForAudio(turn.audioDrain, turn.controller.signal)
     if (!this.owns(turn)) return
     await this.closeStt(turn)
     if (!this.owns(turn)) return
     turn.acceptingTranscript = false
 
     let displays: DisplayInfo[] = []
-    if (turn.settings.selectedSTTProvider === 'assemblyai' && !turn.utterance.trim()) {
+    if (!turn.utterance.trim()) {
       this.cancel('no-transcript'); return
     }
     let screenshotJpegBase64: string | undefined
@@ -179,7 +201,7 @@ export class Orchestrator {
       log.warn('Screen capture failed', { turnId: turn.id, error: String(error) })
     }
     if (!this.owns(turn)) return
-    const query = turn.utterance.trim() || 'Please look at my screen and guide me.'
+    const query = turn.utterance.trim()
     const messages: ChatMessage[] = []
     for (const exchange of conversationHistory.getHistory()) {
       if (exchange.userTranscript) messages.push({ role: 'user', content: exchange.userTranscript })

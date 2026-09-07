@@ -151,3 +151,23 @@ html, body, #root {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(148, 163, 184, 0.4);
 }
+
+.panel-container form {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.panel-container textarea {
+  box-sizing: border-box;
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+  padding: 10px;
+  font: inherit;
+  color: inherit;
+  background: #0f172a;
+  border: 1px solid #64748b;
+  border-radius: 8px;
+}
+.panel-container form p { font-size: 12px; line-height: 1.5; }
+.panel-container textarea:focus-visible { outline: 2px solid #60a5fa; outline-offset: 2px; }

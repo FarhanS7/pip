@@ -27,7 +27,10 @@ function session(): STTSession {
 }
 let orchestrator: Orchestrator
 const begin = () => voiceStateMachine.transitionTo('listening', 'test')
-const process = () => voiceStateMachine.transitionTo('processing', 'test')
+const process = () => {
+  voiceStateMachine.transitionTo('processing', 'test')
+  if (settings.getSettings().selectedSTTProvider === 'web-speech') orchestrator.finishBrowserRecognition('fixture request', voiceStateMachine.getTurnId())
+}
 beforeEach(() => {
   vi.resetAllMocks()
   voiceStateMachine.reset()
@@ -41,6 +44,30 @@ beforeEach(() => {
 afterEach(() => { orchestrator.destroy(); vi.restoreAllMocks() })
 
 describe('Voice turn ownership', () => {
+  it('processes typed input without starting speech recognition or broadcasting listening', async () => {
+    orchestrator.submitText('typed request')
+    expect(mocks.createSession).not.toHaveBeenCalled()
+    expect(mocks.send.mock.calls.some(call => call[0] === IpcChannel.VOICE_STATE_CHANGED && call[1].state === 'listening')).toBe(false)
+    await vi.waitFor(() => expect(mocks.stream).toHaveBeenCalledOnce())
+    expect((mocks.stream.mock.calls[0][0] as VisionPromptPayload).messages.at(-1)?.content).toBe('typed request')
+  })
+
+  it('rejects empty, oversized and overlapping typed requests', () => {
+    expect(() => orchestrator.submitText(' ')).toThrow()
+    expect(() => orchestrator.submitText('a'.repeat(16001))).toThrow()
+    begin()
+    expect(() => orchestrator.submitText('overlap')).toThrow()
+    expect(voiceStateMachine.getState()).toBe('listening')
+  })
+
+  it('waits for browser completion and cancels an empty result without capturing', async () => {
+    begin(); voiceStateMachine.transitionTo('processing', 'test')
+    await Promise.resolve(); expect(mocks.capture).not.toHaveBeenCalled()
+    orchestrator.finishBrowserRecognition('', voiceStateMachine.getTurnId())
+    await Promise.resolve()
+    expect(voiceStateMachine.getState()).toBe('idle')
+    expect(mocks.capture).not.toHaveBeenCalled()
+  })
   it('uses the final transcript received while STT is closing', async () => {
     vi.spyOn(settings, 'getSettings').mockReturnValue({ ...settings.getSettings(), selectedSTTProvider: 'assemblyai' })
     const stt = session()
@@ -116,7 +143,8 @@ describe('Voice turn ownership', () => {
     orchestrator.cancel(); begin()
     orchestrator.setUtterance('current words', voiceStateMachine.getTurnId())
     orchestrator.setUtterance('stale words', oldId)
-    process()
+    voiceStateMachine.transitionTo('processing', 'test')
+    orchestrator.finishBrowserRecognition('current words', voiceStateMachine.getTurnId())
     await vi.waitFor(() => expect(mocks.stream).toHaveBeenCalledOnce())
     expect((mocks.stream.mock.calls[0][0] as VisionPromptPayload).messages.at(-1)?.content).toBe('current words')
   })
