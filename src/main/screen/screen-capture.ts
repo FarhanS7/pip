@@ -24,6 +24,8 @@ export interface CapturedDisplay {
   bounds: { x: number; y: number; width: number; height: number }
   /** Base64-encoded JPEG image string */
   jpegBase64: string
+  imageSize: { width: number; height: number }
+  isPrimary: boolean
 }
 
 export interface ScreenCaptureOptions {
@@ -44,9 +46,12 @@ export async function captureAllScreens(
 ): Promise<CapturedDisplay[]> {
   const maxLongestEdge = options.maxLongestEdge ?? 1280
   const jpegQuality = options.jpegQuality ?? 80
+  if (!Number.isInteger(maxLongestEdge) || maxLongestEdge < 64 || maxLongestEdge > 4096 ||
+      !Number.isInteger(jpegQuality) || jpegQuality < 1 || jpegQuality > 100) throw new ScreenCaptureError('INVALID_CAPTURE_OPTIONS', 'Invalid capture dimensions or quality')
 
   try {
     const displays = screen.getAllDisplays()
+    const primaryId = screen.getPrimaryDisplay().id
     log.info('Starting screen capture', { displayCount: displays.length })
 
     // Fetch sources for screen capture
@@ -63,8 +68,9 @@ export async function captureAllScreens(
 
     for (let index = 0; index < displays.length; index++) {
       const display = displays[index]
-      // Match source by display_id or fallback to index matching
-      const source = sources.find(s => s.display_id === String(display.id)) ?? sources[index] ?? sources[0]
+      // Source enumeration order is not display identity.
+      const matches = sources.filter(s => s.display_id === String(display.id))
+      const source = matches.length === 1 ? matches[0] : undefined
 
       if (!source || !source.thumbnail) {
         log.warn('Missing thumbnail for display', { displayId: display.id, index })
@@ -74,6 +80,7 @@ export async function captureAllScreens(
       // Resize image if needed while preserving aspect ratio
       const image = source.thumbnail
       const size = image.getSize()
+      if (size.width <= 0 || size.height <= 0) continue
       let resizedImage = image
 
       if (size.width > maxLongestEdge || size.height > maxLongestEdge) {
@@ -100,7 +107,8 @@ export async function captureAllScreens(
         displayId: display.id,
         screenIndex: index,
         bounds: { ...display.bounds },
-        jpegBase64
+        jpegBase64,
+        imageSize: resizedImage.getSize(), isPrimary: display.id === primaryId
       })
 
       log.debug('Display captured successfully', {

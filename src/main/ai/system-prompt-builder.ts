@@ -14,6 +14,7 @@ export interface DisplayInfo {
   screenIndex: number
   bounds: { x: number; y: number; width: number; height: number }
   isPrimary?: boolean
+  imageSize?: { width: number; height: number }
 }
 
 export interface SystemPromptOptions {
@@ -29,7 +30,7 @@ export function buildSystemPrompt(options: SystemPromptOptions = {}): string {
   const displays = options.displays ?? []
   const displaySummary = displays.length > 0
     ? displays.map(d =>
-        `- Screen ${d.screenIndex + 1} (ID: ${d.displayId}): ${d.bounds.width}x${d.bounds.height} at origin (${d.bounds.x}, ${d.bounds.y})${d.isPrimary ? ' [Primary]' : ''}`
+        `- Screen ${d.screenIndex + 1} (ID: ${d.displayId}): image ${d.imageSize?.width ?? d.bounds.width}x${d.imageSize?.height ?? d.bounds.height} pixels; desktop ${d.bounds.width}x${d.bounds.height} at origin (${d.bounds.x}, ${d.bounds.y})${d.isPrimary ? ' [Primary]' : ''}`
       ).join('\n')
     : '- Screen 1: Primary display'
 

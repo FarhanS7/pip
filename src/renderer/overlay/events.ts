@@ -16,7 +16,7 @@ export function subscribeOverlayEvents(api: PipAPI, sink: OverlayEventSink): () 
     api.onVoiceStateChanged(({ state, turnId }) => {
       if (turnId !== undefined) sink.setTurnId?.(turnId)
       sink.setVoiceState(state)
-      if (state === 'listening') sink.resetResponse()
+      if (state === 'listening' || state === 'processing') sink.resetResponse()
     }),
     api.onPowerLevelChanged(({ level }) => sink.setPowerLevel(level)),
     api.onPointDetected((point) => sink.setPoint(point)),

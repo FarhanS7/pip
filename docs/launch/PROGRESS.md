@@ -86,3 +86,7 @@ Paid TTS now fetches bounded audio in main and plays it in the single media rend
 ## B02 boundary gate follow-up
 
 After B16 removed the remaining main-process DOM audio use, npm run typecheck:boundaries passes. Windows CI now runs this check as a required job step. Earlier boundary-failure notes are historical evidence, not the current result. Generated Worker environment types and native/toolchain qualification remain separate work. No hosted result is claimed until the new CI run is observed.
+
+## B18 execution update
+
+Implemented exact display-ID capture matching, actual resized-image geometry, true primary-display metadata and screenshot-pixel to desktop-DIP mapping. Missing/ambiguous sources and invalid/out-of-image targets no longer fall back to another display. Overlay points are converted from global to window-local coordinates; new typed turns clear old text/targets. 127 tests / 21 files, lint, all typechecks including no-DOM boundaries, and build pass. Multi-image transport is next (B19); until then metadata describes only the image actually sent. Physical mixed-DPI/monitor-change qualification remains pending.

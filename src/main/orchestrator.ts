@@ -193,8 +193,9 @@ export class Orchestrator {
       const screens = await captureAllScreens()
       if (!this.owns(turn)) return
       screenshotJpegBase64 = screens[0]?.jpegBase64
-      displays = screens.map((screen, screenIndex) => ({
-        displayId: screen.displayId, screenIndex, bounds: screen.bounds, isPrimary: screenIndex === 0
+      // Only the first image is sent until B19 adds multi-image transport.
+      displays = screens.slice(0, 1).map(screen => ({
+        displayId: screen.displayId, screenIndex: screen.screenIndex, bounds: screen.bounds, isPrimary: screen.isPrimary, imageSize: screen.imageSize
       }))
     } catch (error) {
       if (!this.owns(turn)) return
@@ -221,10 +222,12 @@ export class Orchestrator {
     if (!this.owns(turn)) return
     const parsed = parsePointingCoordinates(response)
     if (parsed.coordinate) {
-      const mapped = mapToGlobalScreenCoordinates(parsed.coordinate, Math.max(0, (parsed.screenNumber ?? 1) - 1), displays)
+      const mapped = mapToGlobalScreenCoordinates(parsed.coordinate, (parsed.screenNumber ?? ((displays[0]?.screenIndex ?? 0) + 1)) - 1, displays)
+      if (mapped) {
       this.broadcast(IpcChannel.CURSOR_POSITION, {
         x: mapped.globalX, y: mapped.globalY, label: parsed.elementLabel, screenIndex: mapped.screenIndex
       })
+      }
     }
     turn.tts = createTTSProvider(turn.settings.selectedTTSProvider)
     await turn.tts.speak(parsed.spokenText, turn.controller.signal)

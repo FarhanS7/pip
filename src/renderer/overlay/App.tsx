@@ -47,10 +47,14 @@ function App(): React.JSX.Element {
       },
       setPowerLevel,
       setPoint: ({ x, y, label }) => {
-        setTargetPos({ x, y })
+        const localX = x - window.screenX
+        const localY = y - window.screenY
+        if (localX < 0 || localY < 0 || localX >= window.innerWidth || localY >= window.innerHeight) {
+          setTargetRect(null); return
+        }
+        setTargetPos({ x: localX, y: localY })
         setTargetLabel(label ?? '')
-        // Display-local conversion and multi-monitor routing are tracked in B18.
-        setTargetRect({ x: x - 40, y: y - 20, width: 80, height: 40 })
+        setTargetRect({ x: localX - 40, y: localY - 20, width: 80, height: 40 })
       },
       appendText: (text) => setResponseText((previous) => previous + text)
     })

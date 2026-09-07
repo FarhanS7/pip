@@ -131,3 +131,9 @@ Evidence: 125 tests across 21 files, lint, app/Worker/test types and production 
 ## B02 follow-up: enforce process boundaries
 
 Enabled the existing strict no-DOM typecheck in the Windows verification workflow after it passed locally with B16. No suppressions or widened DOM libraries were added. This prevents reintroducing browser-only audio APIs into main/preload. Hosted CI and independent review remain pending; reverting this one-line CI addition is the rollback if the runner reveals a toolchain issue, while retaining the audio fixes.
+
+## B18: capture identity and image coordinates
+
+Screen capture no longer matches by enumeration index or substitutes the first source. It requires one exact display-ID match, skips empty thumbnails, validates capture size/quality, records actual resized JPEG dimensions and gets primary identity from Electron. The mapper scales image pixels to display-local DIP, adds the display origin, and returns no target for unknown displays, missing geometry or invalid coordinates. Overlays subtract their own window origin and suppress targets outside their viewport. New typed requests clear previous response/target visuals.
+
+Evidence: 127 tests / 21 files, lint, app/Worker/test/no-DOM typechecks and production build pass. Fixtures cover shuffled/missing/ambiguous sources, actual resize dimensions, portrait displays, negative origins, scale conversion and invalid targets. Provider input remains one image until B19; prompt metadata is restricted to that image. Native mixed-DPI/window-origin behavior, display-change races and independent review remain pending. No user screenshot was captured. Rollback: revert B18 with Pip stopped; no persistent data changes.

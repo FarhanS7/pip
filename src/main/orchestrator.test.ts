@@ -40,6 +40,7 @@ vi.mock('./screen/screen-capture', () => ({
     {
       displayId: 100,
       screenIndex: 0,
+      imageSize: { width: 1920, height: 1080 }, isPrimary: true,
       bounds: { x: 0, y: 0, width: 1920, height: 1080 },
       jpegBase64: 'mock-jpeg-base64-data'
     }
@@ -158,7 +159,7 @@ describe('Central Orchestrator Pipeline', () => {
       }))
       expect(sink.appendText).toHaveBeenNthCalledWith(1, 'Click the submit button. ')
       expect(sink.appendText).toHaveBeenNthCalledWith(2, '[POINT:100,200:submit button]')
-      expect(sink.resetResponse).toHaveBeenCalledOnce()
+      expect(sink.resetResponse).toHaveBeenCalledTimes(2)
       expect(sink.setVoiceState).toHaveBeenCalledWith('responding')
       bridge.emit(IpcChannel.AUDIO_POWER_LEVEL, { level: 0.5 })
       expect(sink.setPowerLevel).toHaveBeenCalledWith(0.5)

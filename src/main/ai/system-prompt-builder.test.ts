@@ -11,8 +11,8 @@ describe('buildSystemPrompt', () => {
     })
 
     expect(prompt).toContain('Pip, an intelligent AI screen companion')
-    expect(prompt).toContain('Screen 1 (ID: 10): 1920x1080 at origin (0, 0) [Primary]')
-    expect(prompt).toContain('Screen 2 (ID: 20): 1920x1080 at origin (1920, 0)')
+    expect(prompt).toContain('Screen 1 (ID: 10): image 1920x1080 pixels; desktop 1920x1080 at origin (0, 0) [Primary]')
+    expect(prompt).toContain('Screen 2 (ID: 20): image 1920x1080 pixels; desktop 1920x1080 at origin (1920, 0)')
     expect(prompt).toContain('[POINT:x,y:element_label]')
     expect(prompt).toContain('[POINT:none]')
   })

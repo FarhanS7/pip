@@ -1,73 +1,18 @@
-/**
- * Multi-Monitor Coordinate Mapper (Task F.5)
- *
- * Transforms local display image point coordinates into global desktop screen coordinates.
- * Formula:
- *   globalX = localX + display.bounds.x
- *   globalY = localY + display.bounds.y
- *
- * References:
- *   PHASE_0_ARCHITECTURE.md §0.1 (main/state module)
- *   PHASE_1_MODULES_AND_TASKS.md Task F.5 scoped checklist
- */
-
-import { DisplayInfo } from '../ai/system-prompt-builder'
-
-export interface Point {
-  x: number
-  y: number
-}
-
+import type { DisplayInfo } from '../ai/system-prompt-builder'
+export interface Point { x: number; y: number }
 export interface MappedPoint {
-  globalX: number
-  globalY: number
-  localX: number
-  localY: number
-  screenIndex: number
-  displayId: number
+  globalX: number; globalY: number; localX: number; localY: number; screenIndex: number; displayId: number
 }
 
-/**
- * Maps local display coordinates to global desktop coordinates.
- *
- * @param localPoint - Target point relative to the display image (0,0 top-left of display)
- * @param targetScreenIndex - 0-based screen index (or target screen index)
- * @param displays - List of connected display infos
- * @returns MappedPoint object containing both local and global screen coordinates
- */
-export function mapToGlobalScreenCoordinates(
-  localPoint: Point,
-  targetScreenIndex: number,
-  displays: DisplayInfo[]
-): MappedPoint {
-  if (!displays || displays.length === 0) {
-    // Default fallback if display list is empty
-    return {
-      globalX: localPoint.x,
-      globalY: localPoint.y,
-      localX: localPoint.x,
-      localY: localPoint.y,
-      screenIndex: 0,
-      displayId: 0
-    }
-  }
-
-  // Find target display by screen index, fallback to primary or first display
-  const targetDisplay = displays.find(d => d.screenIndex === targetScreenIndex)
-    ?? displays.find(d => d.isPrimary)
-    ?? displays[0]
-
-  const bounds = targetDisplay.bounds ?? { x: 0, y: 0, width: 1920, height: 1080 }
-
-  const globalX = Math.round(localPoint.x + bounds.x)
-  const globalY = Math.round(localPoint.y + bounds.y)
-
-  return {
-    globalX,
-    globalY,
-    localX: localPoint.x,
-    localY: localPoint.y,
-    screenIndex: targetDisplay.screenIndex,
-    displayId: targetDisplay.displayId
-  }
+/** Screenshot pixels -> display-local DIP -> global desktop DIP. Never guess a display. */
+export function mapToGlobalScreenCoordinates(point: Point, index: number, displays: DisplayInfo[]): MappedPoint | null {
+  const display = displays.find(item => item.screenIndex === index)
+  if (!display || !Number.isSafeInteger(index) || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null
+  const size = display.imageSize
+  if (!size || size.width <= 0 || size.height <= 0 || point.x < 0 || point.y < 0 || point.x >= size.width || point.y >= size.height) return null
+  const bounds = display.bounds
+  if (![bounds.x, bounds.y, bounds.width, bounds.height, size.width, size.height].every(Number.isFinite) || bounds.width <= 0 || bounds.height <= 0) return null
+  const localX = Math.min(bounds.width - 1, Math.round(point.x * bounds.width / size.width))
+  const localY = Math.min(bounds.height - 1, Math.round(point.y * bounds.height / size.height))
+  return { globalX: localX + bounds.x, globalY: localY + bounds.y, localX, localY, screenIndex: index, displayId: display.displayId }
 }
