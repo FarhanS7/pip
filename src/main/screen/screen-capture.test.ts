@@ -34,3 +34,14 @@ describe('Screen capture identity', () => {
     expect(fixtures.sources).not.toHaveBeenCalled()
   })
 })
+
+it('detects moved or disconnected displays before pointing', async () => {
+  const { displaySnapshotMatches } = await import('./screen-capture')
+  fixtures.displays.mockReturnValue([display(100)])
+  const snapshot = [{ displayId: 100, bounds: display(100).bounds }]
+  expect(displaySnapshotMatches(snapshot)).toBe(true)
+  fixtures.displays.mockReturnValue([{ ...display(100), bounds: { ...display(100).bounds, x: 200 } }])
+  expect(displaySnapshotMatches(snapshot)).toBe(false)
+  fixtures.displays.mockReturnValue([])
+  expect(displaySnapshotMatches(snapshot)).toBe(false)
+})

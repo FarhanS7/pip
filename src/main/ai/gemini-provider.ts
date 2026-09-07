@@ -1,3 +1,4 @@
+import { readProviderText } from './sse-stream'
 import { visionMessages } from './vision-messages'
 /**
  * Google Gemini Vision Streaming Provider (Task C.4)
@@ -68,43 +69,6 @@ export class GeminiProvider implements AIProvider {
       throw new AIProviderError('WORKER_CONNECT_FAILED', `Failed to connect to proxy: ${String(err)}`, 'high')
     }
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      log.error('Worker proxy returned HTTP error', { status: response.status, body: errorText })
-      throw new AIProviderError('AI_PROXY_ERROR', `Worker returned HTTP ${response.status}: ${errorText}`, 'high')
-    }
-
-    if (!response.body) {
-      throw new AIProviderError('EMPTY_RESPONSE_BODY', 'Worker returned empty SSE response body', 'medium')
-    }
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (trimmed.startsWith('data: ')) {
-          const dataStr = trimmed.slice(6)
-          try {
-            const parsed = JSON.parse(dataStr)
-            const textChunk = parsed.candidates?.[0]?.content?.parts?.[0]?.text
-            if (textChunk) {
-              yield textChunk
-            }
-          } catch {
-            // Ignore partial SSE lines
-          }
-        }
-      }
-    }
+    yield* readProviderText(response, 'gemini', payload.signal)
   }
 }

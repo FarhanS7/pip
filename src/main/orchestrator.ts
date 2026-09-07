@@ -5,7 +5,7 @@ import { getSettings } from './state/settings'
 import { createSTTProvider, STTSession } from './audio/stt-provider'
 import { createAIProvider, ChatMessage } from './ai/ai-provider'
 import { createTTSProvider, TTSProvider } from './tts/tts-provider'
-import { captureAllScreens } from './screen/screen-capture'
+import { captureAllScreens, displaySnapshotMatches } from './screen/screen-capture'
 import { buildSystemPrompt, DisplayInfo } from './ai/system-prompt-builder'
 import { parsePointingCoordinates } from './ai/response-parser'
 import { mapToGlobalScreenCoordinates } from './state/coordinate-mapper'
@@ -222,8 +222,9 @@ export class Orchestrator {
       this.broadcast(IpcChannel.AI_RESPONSE_CHUNK, { text: chunk })
     }
     if (!this.owns(turn)) return
+    if (!response.trim()) throw new Error('Empty AI response')
     const parsed = parsePointingCoordinates(response)
-    if (parsed.coordinate) {
+    if (parsed.coordinate && displaySnapshotMatches(displays)) {
       const mapped = mapToGlobalScreenCoordinates(parsed.coordinate, (parsed.screenNumber ?? ((displays[0]?.screenIndex ?? 0) + 1)) - 1, displays)
       if (mapped) {
       this.broadcast(IpcChannel.CURSOR_POSITION, {

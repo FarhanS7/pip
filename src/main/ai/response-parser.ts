@@ -44,11 +44,12 @@ export function parsePointingCoordinates(responseText: string): PointingParseRes
     }
   }
 
-  const match = responseText.match(POINT_TAG_REGEX)
+  const cleanText = responseText.replace(/\[POINT:[^\]]*(?:\]|$)/gi, '').trim()
+  const match = (responseText.match(/\[POINT:/gi)?.length ?? 0) === 1 ? responseText.match(POINT_TAG_REGEX) : null
 
   if (!match) {
     return {
-      spokenText: responseText.trim(),
+      spokenText: cleanText,
       coordinate: null,
       elementLabel: null,
       screenNumber: null
@@ -75,9 +76,9 @@ export function parsePointingCoordinates(responseText: string): PointingParseRes
   const label = match[4] ? match[4].trim() : null
   const screenNumber = match[5] ? parseInt(match[5], 10) : null
 
-  if (isNaN(x) || isNaN(y)) {
+  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || (screenNumber !== null && (!Number.isSafeInteger(screenNumber) || screenNumber < 1))) {
     return {
-      spokenText: responseText.trim(),
+      spokenText: cleanText,
       coordinate: null,
       elementLabel: null,
       screenNumber: null

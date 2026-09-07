@@ -60,10 +60,18 @@ describe('parsePointingCoordinates', () => {
     const input = 'some text [POINT:invalid,data]'
     const result = parsePointingCoordinates(input)
     expect(result).toEqual({
-      spokenText: 'some text [POINT:invalid,data]',
+      spokenText: 'some text',
       coordinate: null,
       elementLabel: null,
       screenNumber: null
     })
   })
+})
+
+it('suppresses ambiguous, truncated and numerically unsafe point tags', () => {
+  for (const text of ['Answer [POINT:1,2:first] [POINT:3,4:second]', 'Answer [POINT:unfinished', 'Answer [POINT:99999999999999999999,2:target]', 'Answer [POINT:1,2:target:screen0]']) {
+    const parsed = parsePointingCoordinates(text)
+    expect(parsed.coordinate).toBeNull()
+    expect(parsed.spokenText).not.toContain('[POINT:')
+  }
 })

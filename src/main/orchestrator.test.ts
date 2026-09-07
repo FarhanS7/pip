@@ -36,6 +36,7 @@ vi.mock('electron', () => ({
 
 // Mock Screen Capture
 vi.mock('./screen/screen-capture', () => ({
+  displaySnapshotMatches: () => true,
   captureAllScreens: vi.fn(async () => [
     {
       displayId: 100,

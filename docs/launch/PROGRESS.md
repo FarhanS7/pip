@@ -94,3 +94,7 @@ Implemented exact display-ID capture matching, actual resized-image geometry, tr
 ## B19 execution update
 
 All three AI adapters now send labeled current display images only on the latest user message, preserving text-only history. Orchestration includes matching metadata for all sent displays. Requests are bounded to four images and 8 MiB of base64 image content. 131 tests / 22 files, lint, all typechecks and build pass. Server enforcement, user display selection and real-provider multi-image qualification remain open.
+
+## B20 execution update
+
+Added shared bounded SSE decoding with UTF-8/chunk/CRLF handling, final-buffer processing, idle/total deadlines and reader cancellation. Provider errors, malformed JSON and incomplete streams now fail rather than silently succeeding. Ambiguous/malformed point tags are removed from speech, invalid targets are suppressed, and display geometry is rechecked before pointing. 140 tests / 23 files pass; lint, all typechecks and build pass. Fetch-header deadlines, native display races and live provider stream certification remain open.

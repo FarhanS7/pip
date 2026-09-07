@@ -15,6 +15,14 @@ import { createLogger } from '../logger'
 
 const log = createLogger('screen-capture')
 
+export function displaySnapshotMatches(displays: { displayId: number; bounds: { x: number; y: number; width: number; height: number } }[]): boolean {
+  const current = screen.getAllDisplays()
+  return displays.every(snapshot => {
+    const display = current.find(item => item.id === snapshot.displayId)
+    return display && ['x', 'y', 'width', 'height'].every(key => display.bounds[key as keyof typeof display.bounds] === snapshot.bounds[key as keyof typeof snapshot.bounds])
+  })
+}
+
 export interface CapturedDisplay {
   /** OS display ID */
   displayId: number

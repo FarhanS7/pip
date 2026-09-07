@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
 }))
 vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [{ isDestroyed: () => false, webContents: { send: mocks.send } }] } }))
 vi.mock('./audio/stt-provider', () => ({ createSTTProvider: () => ({ createSession: mocks.createSession }) }))
-vi.mock('./screen/screen-capture', () => ({ captureAllScreens: mocks.capture }))
+vi.mock('./screen/screen-capture', () => ({ captureAllScreens: mocks.capture, displaySnapshotMatches: () => true }))
 vi.mock('./ai/ai-provider', () => ({ createAIProvider: () => ({ streamChat: mocks.stream }) }))
 vi.mock('./tts/tts-provider', () => ({ createTTSProvider: () => ({ speak: mocks.speak, stop: mocks.stop }) }))
 import { Orchestrator } from './orchestrator'

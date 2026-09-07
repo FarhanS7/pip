@@ -1,3 +1,4 @@
+import { readProviderText } from './sse-stream'
 import { visionMessages } from './vision-messages'
 /**
  * Claude Vision Streaming Provider (Task C.2)
@@ -68,44 +69,6 @@ export class ClaudeProvider implements AIProvider {
       throw new AIProviderError('WORKER_CONNECT_FAILED', `Failed to connect to proxy: ${String(err)}`, 'high')
     }
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      log.error('Worker proxy returned HTTP error', { status: response.status, body: errorText })
-      throw new AIProviderError('AI_PROXY_ERROR', `Worker returned HTTP ${response.status}: ${errorText}`, 'high')
-    }
-
-    if (!response.body) {
-      throw new AIProviderError('EMPTY_RESPONSE_BODY', 'Worker returned empty SSE response body', 'medium')
-    }
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() || ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (trimmed.startsWith('data: ')) {
-          const dataStr = trimmed.slice(6)
-          if (dataStr === '[DONE]') continue
-
-          try {
-            const parsed = JSON.parse(dataStr)
-            if (parsed.type === 'content_block_delta' && parsed.delta?.text) {
-              yield parsed.delta.text
-            }
-          } catch {
-            // Ignore partial SSE lines
-          }
-        }
-      }
-    }
+    yield* readProviderText(response, 'claude', payload.signal)
   }
 }

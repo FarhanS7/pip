@@ -3,7 +3,7 @@ import { createAIProvider } from './ai-provider'
 afterEach(() => vi.unstubAllGlobals())
 describe('Multi-display vision requests', () => {
   it.each(['claude', 'openai', 'gemini'] as const)('attaches labeled images once to the latest %s request', async provider => {
-    const fetch = vi.fn().mockResolvedValue(new Response(''))
+    const fetch = vi.fn().mockResolvedValue(new Response('data: [DONE]\n\n'))
     vi.stubGlobal('fetch', fetch)
     for await (const _chunk of createAIProvider(provider).streamChat({
       messages: [{ role: 'user', content: 'old question' }, { role: 'assistant', content: 'old answer' }, { role: 'user', content: 'current question' }],
