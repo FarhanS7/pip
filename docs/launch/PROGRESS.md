@@ -90,3 +90,7 @@ After B16 removed the remaining main-process DOM audio use, npm run typecheck:bo
 ## B18 execution update
 
 Implemented exact display-ID capture matching, actual resized-image geometry, true primary-display metadata and screenshot-pixel to desktop-DIP mapping. Missing/ambiguous sources and invalid/out-of-image targets no longer fall back to another display. Overlay points are converted from global to window-local coordinates; new typed turns clear old text/targets. 127 tests / 21 files, lint, all typechecks including no-DOM boundaries, and build pass. Multi-image transport is next (B19); until then metadata describes only the image actually sent. Physical mixed-DPI/monitor-change qualification remains pending.
+
+## B19 execution update
+
+All three AI adapters now send labeled current display images only on the latest user message, preserving text-only history. Orchestration includes matching metadata for all sent displays. Requests are bounded to four images and 8 MiB of base64 image content. 131 tests / 22 files, lint, all typechecks and build pass. Server enforcement, user display selection and real-provider multi-image qualification remain open.

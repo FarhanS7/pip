@@ -188,13 +188,15 @@ export class Orchestrator {
     if (!turn.utterance.trim()) {
       this.cancel('no-transcript'); return
     }
-    let screenshotJpegBase64: string | undefined
+    let images: { screenIndex: number; jpegBase64: string }[] = []
     try {
       const screens = await captureAllScreens()
       if (!this.owns(turn)) return
-      screenshotJpegBase64 = screens[0]?.jpegBase64
-      // Only the first image is sent until B19 adds multi-image transport.
-      displays = screens.slice(0, 1).map(screen => ({
+      if (screens.length > 4 || screens.reduce((sum, screen) => sum + screen.jpegBase64.length, 0) > 8 * 1024 * 1024) {
+        this.cancel('capture-limit'); return
+      }
+      images = screens.map(screen => ({ screenIndex: screen.screenIndex, jpegBase64: screen.jpegBase64 }))
+      displays = screens.map(screen => ({
         displayId: screen.displayId, screenIndex: screen.screenIndex, bounds: screen.bounds, isPrimary: screen.isPrimary, imageSize: screen.imageSize
       }))
     } catch (error) {
@@ -213,7 +215,7 @@ export class Orchestrator {
     voiceStateMachine.transitionTo('responding', 'ai-stream-start')
     let response = ''
     for await (const chunk of provider.streamChat({
-      messages, screenshotJpegBase64, systemPrompt: buildSystemPrompt({ displays }), signal: turn.controller.signal
+      messages, images, systemPrompt: buildSystemPrompt({ displays }), signal: turn.controller.signal
     })) {
       if (!this.owns(turn)) return
       response += chunk

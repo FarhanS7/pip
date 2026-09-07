@@ -1,3 +1,4 @@
+import { visionMessages } from './vision-messages'
 /**
  * Claude Vision Streaming Provider (Task C.2)
  *
@@ -41,34 +42,7 @@ export class ClaudeProvider implements AIProvider {
     })
 
     // Construct Anthropic messages format
-    const formattedMessages: unknown[] = []
-
-    for (const msg of payload.messages) {
-      if (msg.role === 'user' && payload.screenshotJpegBase64) {
-        formattedMessages.push({
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'base64',
-                media_type: 'image/jpeg',
-                data: payload.screenshotJpegBase64
-              }
-            },
-            {
-              type: 'text',
-              text: msg.content
-            }
-          ]
-        })
-      } else if (msg.role !== 'system') {
-        formattedMessages.push({
-          role: msg.role,
-          content: msg.content
-        })
-      }
-    }
+    const formattedMessages = visionMessages(payload, 'claude')
 
     const requestBody = {
       model: this.model || this.defaultModel,

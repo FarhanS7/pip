@@ -1,3 +1,4 @@
+import { visionMessages } from './vision-messages'
 /**
  * OpenAI GPT-4o Vision Streaming Provider (Task C.3)
  *
@@ -40,31 +41,7 @@ export class OpenAIProvider implements AIProvider {
       accessibilityTreeText: payload.accessibilityTreeText
     })
 
-    const formattedMessages: unknown[] = [
-      { role: 'system', content: systemPrompt }
-    ]
-
-    for (const msg of payload.messages) {
-      if (msg.role === 'user' && payload.screenshotJpegBase64) {
-        formattedMessages.push({
-          role: 'user',
-          content: [
-            { type: 'text', text: msg.content },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:image/jpeg;base64,${payload.screenshotJpegBase64}`
-              }
-            }
-          ]
-        })
-      } else if (msg.role !== 'system') {
-        formattedMessages.push({
-          role: msg.role,
-          content: msg.content
-        })
-      }
-    }
+    const formattedMessages = [{ role: 'system', content: systemPrompt }, ...visionMessages(payload, 'openai')]
 
     const requestBody = {
       provider: 'openai',

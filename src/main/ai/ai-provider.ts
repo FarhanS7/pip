@@ -8,6 +8,7 @@ export interface ChatMessage {
 }
 
 export interface VisionPromptPayload {
+  images?: { screenIndex: number; jpegBase64: string }[]
   signal?: AbortSignal
   messages: ChatMessage[]
   screenshotJpegBase64?: string

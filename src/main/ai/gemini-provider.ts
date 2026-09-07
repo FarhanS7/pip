@@ -1,3 +1,4 @@
+import { visionMessages } from './vision-messages'
 /**
  * Google Gemini Vision Streaming Provider (Task C.4)
  *
@@ -40,29 +41,7 @@ export class GeminiProvider implements AIProvider {
       accessibilityTreeText: payload.accessibilityTreeText
     })
 
-    const contents: unknown[] = []
-
-    for (const msg of payload.messages) {
-      if (msg.role === 'user' && payload.screenshotJpegBase64) {
-        contents.push({
-          role: 'user',
-          parts: [
-            { text: msg.content },
-            {
-              inline_data: {
-                mime_type: 'image/jpeg',
-                data: payload.screenshotJpegBase64
-              }
-            }
-          ]
-        })
-      } else if (msg.role !== 'system') {
-        contents.push({
-          role: msg.role === 'assistant' ? 'model' : 'user',
-          parts: [{ text: msg.content }]
-        })
-      }
-    }
+    const contents = visionMessages(payload, 'gemini')
 
     const requestBody = {
       provider: 'gemini',
