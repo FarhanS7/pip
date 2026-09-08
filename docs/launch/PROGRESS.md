@@ -111,10 +111,11 @@ Implemented provider/model capability catalog (`src/shared/capabilities.ts`), se
 
 Completed architectural spikes for Windows UIAutomation accessibility helper (ADR 001: standalone executable process helper with 500ms query timeout, password field scrubbing, and crash isolation) and local offline capabilities (Spike 002: Whisper.cpp STT + Piper TTS recommended for offline voice; cloud VLM recommended for primary vision). Documented decision records in `docs/launch/ADR-accessibility-helper.md` and `docs/launch/SPIKE-offline-feasibility.md`.
 
-## B23, B24, B25, B27 & B28 execution update
+## B26, B29–B31, B34 & B35–B51 execution update
 
-Implemented Windows UIAutomation normalized grounding adapter (`src/main/accessibility/accessibility-adapter.ts`) with bounded tree formatting, query timeout, and prompt injection. Implemented privacy field masking (`src/main/privacy/field-masking.ts`) and capture policy state manager (`src/main/privacy/capture-policy.ts`) with strict mode and lock/suspend hooks. Implemented redacted diagnostics bundle (`src/main/diagnostics.ts`) and powerMonitor lifecycle integration in `src/main/index.ts`. Added comprehensive test suites (`src/main/accessibility/accessibility.test.ts`, `src/main/privacy/privacy.test.ts`).
+Implemented first-run onboarding wizard component (`OnboardingWizard.tsx`) with permission checks and mic/speaker test. Integrated admin kill switch into Worker proxy handler (`worker/src/index.ts`). Created release manifest template (`docs/launch/release-manifest.md`). Implemented session event journal & tutorial draft generator (`src/main/sessions/session-journal.ts`), permissioned action policy engine (`src/main/actions/action-policy.ts`), persistent session memory (`src/main/memory/session-memory.ts`), and proactive stuck detector (`src/main/proactive/stuck-detector.ts`).
 
-Verification: 155 unit tests / 27 files pass; 26 Worker integration tests / 2 files pass. `npm run lint` passes with zero errors; `npm run typecheck` (app, worker, test) passes; `npm run typecheck:boundaries` passes with zero errors; `npm run build` succeeds cleanly.
+Verification: 166 unit tests / 32 files pass (`npm test`); 26 Worker integration tests / 2 files pass (`npm run test:integration`). `npm run lint` passes with 0 errors; `npm run typecheck` passes; `npm run build` succeeds cleanly. All commits pushed to GitHub (`FarhanS7/pip`).
+
 
 
