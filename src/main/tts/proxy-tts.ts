@@ -2,6 +2,8 @@ import type { TTSProvider } from './tts-provider'
 import { TTSError } from '../errors'
 import { createMediaWindow, mediaPlayback } from '../windows/media-window'
 
+import { getAppConfig } from '../config'
+
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024
 
 /** Fetch in main; decode and play only in the single media renderer. */
@@ -10,11 +12,18 @@ export abstract class ProxyTTSProvider implements TTSProvider {
   abstract readonly displayName: string
   readonly requiresApiKey = true
   private active: AbortController | null = null
+  private readonly workerUrl: string
+  private readonly sharedSecret: string
+
   constructor(
     private provider: 'openai' | 'elevenlabs',
-    private workerUrl = process.env.PIP_WORKER_URL || 'http://127.0.0.1:8787',
-    private sharedSecret = process.env.PIP_SHARED_SECRET || ''
-  ) {}
+    workerUrl?: string,
+    sharedSecret?: string
+  ) {
+    const config = getAppConfig()
+    this.workerUrl = (workerUrl || config.workerUrl).replace(/\/+$/, '')
+    this.sharedSecret = sharedSecret ?? config.sharedSecret
+  }
 
   async speak(text: string, signal?: AbortSignal): Promise<void> {
     signal?.throwIfAborted()

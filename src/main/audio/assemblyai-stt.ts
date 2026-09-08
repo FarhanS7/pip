@@ -110,14 +110,20 @@ export class AssemblyAISTTSession implements STTSession {
   }
 }
 
+import { getAppConfig } from '../config'
+
 export class AssemblyAISTTProvider implements STTProvider {
   readonly name = 'assemblyai'
   readonly displayName = 'AssemblyAI Real-Time STT'
   readonly requiresApiKey = true
-  constructor(
-    private workerUrl = process.env.PIP_WORKER_URL || 'http://127.0.0.1:8787',
-    private sharedSecret = process.env.PIP_SHARED_SECRET || ''
-  ) {}
+  private readonly workerUrl: string
+  private readonly sharedSecret: string
+
+  constructor(workerUrl?: string, sharedSecret?: string) {
+    const config = getAppConfig()
+    this.workerUrl = (workerUrl || config.workerUrl).replace(/\/+$/, '')
+    this.sharedSecret = sharedSecret ?? config.sharedSecret
+  }
 
   async createSession(signal?: AbortSignal): Promise<STTSession> {
     signal?.throwIfAborted()

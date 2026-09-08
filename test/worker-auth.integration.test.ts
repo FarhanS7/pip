@@ -5,9 +5,16 @@ import ts from 'typescript'
 
 const secret = 'test-only-random-looking-credential-7f2f0a'
 const placeholder = 'your-shared-secret-placeholder'
-const script = ts.transpileModule(readFileSync('worker/src/index.ts', 'utf8'), {
-  compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
-}).outputText
+function transpile(filePath: string): string {
+  return ts.transpileModule(readFileSync(filePath, 'utf8'), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 }
+  }).outputText
+}
+
+const modules = [
+  { type: 'ESModule' as const, path: 'index.js', contents: transpile('worker/src/index.ts') },
+  { type: 'ESModule' as const, path: 'validation.js', contents: transpile('worker/src/validation.ts') }
+]
 
 const protectedRoutes = [
   { path: '/chat', method: 'POST' },
@@ -24,8 +31,8 @@ const upstream = vi.fn(async () => new MiniflareResponse('{"token":"fixture-toke
 
 function createWorker(configuredSecret: string | null = secret): Miniflare {
   worker = new Miniflare({
-    modules: true,
-    script,
+    modules,
+    scriptPath: 'index.js',
     compatibilityDate: '2024-01-01',
     bindings: {
       ANTHROPIC_API_KEY: 'fixture-only',

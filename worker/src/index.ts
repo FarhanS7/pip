@@ -11,6 +11,14 @@
  *   POST /transcribe-token  → Temporary short-lived AssemblyAI WebSocket token
  */
 
+import {
+  MAX_BODY_SIZE_BYTES,
+  DEFAULT_UPSTREAM_TIMEOUT_MS,
+  validateChatRequestBody,
+  validateTTSRequestBody,
+  sanitizeErrorMessage
+} from './validation.js'
+
 interface Env {
   ANTHROPIC_API_KEY?: string
   OPENAI_API_KEY?: string
@@ -24,7 +32,7 @@ interface Env {
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Pip-Auth'
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Pip-Auth, X-Request-ID'
 }
 
 export default {
@@ -34,13 +42,19 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS })
     }
 
+    const requestId = request.headers.get('X-Request-ID') || crypto.randomUUID()
+    const responseHeaders = {
+      ...CORS_HEADERS,
+      'X-Request-ID': requestId
+    }
+
     const url = new URL(request.url)
 
     try {
       if (url.pathname === '/health' && request.method === 'GET') {
         return new Response(JSON.stringify({ status: 'ok', service: 'pip-proxy' }), {
           status: 200,
-          headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
+          headers: { ...responseHeaders, 'content-type': 'application/json' }
         })
       }
 
@@ -48,7 +62,7 @@ export default {
       if (!expectedSecret?.trim() || expectedSecret.trim() === 'your-shared-secret-placeholder') {
         return new Response(
           JSON.stringify({ error: 'Service authentication is not configured' }),
-          { status: 503, headers: { ...CORS_HEADERS, 'content-type': 'application/json' } }
+          { status: 503, headers: { ...responseHeaders, 'content-type': 'application/json' } }
         )
       }
 
@@ -56,37 +70,35 @@ export default {
       if (!authHeader || !(await credentialsMatch(authHeader, expectedSecret))) {
         return new Response(
           JSON.stringify({ error: 'Unauthorized: Missing or invalid X-Pip-Auth header' }),
-          { status: 401, headers: { ...CORS_HEADERS, 'content-type': 'application/json' } }
+          { status: 401, headers: { ...responseHeaders, 'content-type': 'application/json' } }
         )
       }
 
       if (url.pathname === '/chat' && request.method === 'POST') {
-        return await handleChat(request, env)
+        return await handleChat(request, env, responseHeaders, requestId)
       }
 
       if (url.pathname === '/tts' && request.method === 'POST') {
-        return await handleTTS(request, env)
+        return await handleTTS(request, env, responseHeaders, requestId)
       }
 
       if ((url.pathname === '/transcribe-token' || url.pathname === '/transcribe-token/') &&
           (request.method === 'POST' || request.method === 'GET')) {
-        return await handleTranscribeToken(env)
+        return await handleTranscribeToken(env, responseHeaders, requestId)
       }
     } catch (error) {
       console.error(`[${url.pathname}] Unhandled proxy error:`, error)
       return new Response(
-        JSON.stringify({ error: String(error) }),
-        { status: 500, headers: { ...CORS_HEADERS, 'content-type': 'application/json' } }
+        JSON.stringify({ error: sanitizeErrorMessage(error) }),
+        { status: 500, headers: { ...responseHeaders, 'content-type': 'application/json' } }
       )
     }
 
-    return new Response('Not found', { status: 404, headers: CORS_HEADERS })
+    return new Response('Not found', { status: 404, headers: responseHeaders })
   }
 }
 
 async function credentialsMatch(provided: string, expected: string): Promise<boolean> {
-  // Fixed-size digests allow the runtime's timing-safe comparison even when
-  // credential lengths differ. Do not replace this with string equality.
   const encoder = new TextEncoder()
   const [providedDigest, expectedDigest] = await Promise.all([
     crypto.subtle.digest('SHA-256', encoder.encode(provided)),
@@ -98,233 +110,307 @@ async function credentialsMatch(provided: string, expected: string): Promise<boo
 /**
  * Handle AI chat completions (Claude, OpenAI, Gemini).
  */
-async function handleChat(request: Request, env: Env): Promise<Response> {
-  const bodyText = await request.text()
-  let bodyJson: Record<string, unknown> = {}
-  try {
-    bodyJson = JSON.parse(bodyText)
-  } catch {
-    // Fall back to raw body text
+async function handleChat(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>,
+  requestId: string
+): Promise<Response> {
+  const contentLengthStr = request.headers.get('content-length')
+  if (contentLengthStr && parseInt(contentLengthStr, 10) > MAX_BODY_SIZE_BYTES) {
+    return new Response(JSON.stringify({ error: 'Payload exceeds maximum allowed size (16 MiB)' }), {
+      status: 413,
+      headers: { ...headers, 'content-type': 'application/json' }
+    })
   }
 
-  const provider = (bodyJson.provider as string) || 'claude'
+  const bodyText = await request.text()
+  const val = validateChatRequestBody(bodyText)
+  if (!val.valid || !val.data) {
+    return new Response(JSON.stringify({ error: val.error || 'Invalid request' }), {
+      status: val.status || 400,
+      headers: { ...headers, 'content-type': 'application/json' }
+    })
+  }
+
+  const { provider, model, bodyJson } = val.data
 
   if (provider === 'openai') {
     if (!env.OPENAI_API_KEY) {
       return new Response(JSON.stringify({ error: 'OPENAI_API_KEY not configured on Worker' }), {
         status: 500,
-        headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
+        headers: { ...headers, 'content-type': 'application/json' }
       })
     }
 
-    // Strip custom provider field before forwarding to OpenAI
     delete bodyJson.provider
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'authorization': `Bearer ${env.OPENAI_API_KEY}`,
-        'content-type': 'application/json'
-      },
-      body: JSON.stringify(bodyJson)
-    })
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'authorization': `Bearer ${env.OPENAI_API_KEY}`,
+          'content-type': 'application/json',
+          'x-request-id': requestId
+        },
+        body: JSON.stringify(bodyJson),
+        signal: AbortSignal.timeout(DEFAULT_UPSTREAM_TIMEOUT_MS)
+      })
 
-    return new Response(response.body, {
-      status: response.status,
-      headers: {
-        ...CORS_HEADERS,
-        'content-type': response.headers.get('content-type') || 'text/event-stream',
-        'cache-control': 'no-cache'
-      }
-    })
+      return new Response(response.body, {
+        status: response.status,
+        headers: {
+          ...headers,
+          'content-type': response.headers.get('content-type') || 'text/event-stream',
+          'cache-control': 'no-cache'
+        }
+      })
+    } catch (err) {
+      return new Response(JSON.stringify({ error: `OpenAI upstream request failed: ${sanitizeErrorMessage(err)}` }), {
+        status: 502,
+        headers: { ...headers, 'content-type': 'application/json' }
+      })
+    }
   }
 
   if (provider === 'gemini') {
     if (!env.GOOGLE_AI_KEY) {
       return new Response(JSON.stringify({ error: 'GOOGLE_AI_KEY not configured on Worker' }), {
         status: 500,
-        headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
+        headers: { ...headers, 'content-type': 'application/json' }
       })
     }
 
     const apiKey = env.GOOGLE_AI_KEY.trim().replace(/^["']|["']$/g, '')
-    const primaryModel = (bodyJson.model as string) || 'gemini-3.6-flash'
-    const candidateModels = Array.from(new Set([primaryModel, 'gemini-3.6-flash', 'gemini-3.6-pro', 'gemini-3.0-flash', 'gemini-1.5-flash']))
+    const targetModel = model || 'gemini-3.6-flash'
     delete bodyJson.provider
     delete bodyJson.model
 
-    let lastResponse: Response | null = null
-    let lastErrorBody = ''
-    for (const m of candidateModels) {
-      console.log(`[gemini] Trying model ${m}...`)
+    try {
       const resp = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${m}:streamGenerateContent?alt=sse&key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${targetModel}:streamGenerateContent?alt=sse&key=${apiKey}`,
         {
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            'x-goog-api-key': apiKey
+            'x-goog-api-key': apiKey,
+            'x-request-id': requestId
           },
-          body: JSON.stringify(bodyJson)
+          body: JSON.stringify(bodyJson),
+          signal: AbortSignal.timeout(DEFAULT_UPSTREAM_TIMEOUT_MS)
         }
       )
+
       if (resp.ok) {
-        console.log(`[gemini] Model ${m} succeeded`)
         return new Response(resp.body, {
           status: resp.status,
           headers: {
-            ...CORS_HEADERS,
+            ...headers,
             'content-type': resp.headers.get('content-type') || 'text/event-stream',
             'cache-control': 'no-cache'
           }
         })
       }
-      lastErrorBody = await resp.text()
-      console.error(`[gemini] Model ${m} failed (${resp.status}):`, lastErrorBody)
-      lastResponse = resp
-    }
 
-    return new Response(JSON.stringify({ error: `Gemini request failed (${lastResponse?.status}): ${lastErrorBody}` }), {
-      status: lastResponse ? lastResponse.status : 503,
-      headers: {
-        ...CORS_HEADERS,
-        'content-type': 'application/json'
-      }
-    })
+      const errorBody = await resp.text()
+      return new Response(JSON.stringify({ error: `Gemini request failed (${resp.status}): ${sanitizeErrorMessage(errorBody)}` }), {
+        status: resp.status,
+        headers: { ...headers, 'content-type': 'application/json' }
+      })
+    } catch (err) {
+      return new Response(JSON.stringify({ error: `Gemini upstream request failed: ${sanitizeErrorMessage(err)}` }), {
+        status: 502,
+        headers: { ...headers, 'content-type': 'application/json' }
+      })
+    }
   }
 
   // Default provider: Anthropic Claude
   if (!env.ANTHROPIC_API_KEY) {
     return new Response(JSON.stringify({ error: 'ANTHROPIC_API_KEY not configured on Worker' }), {
       status: 500,
-      headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
+      headers: { ...headers, 'content-type': 'application/json' }
     })
   }
 
   delete bodyJson.provider
 
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': env.ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json'
-    },
-    body: JSON.stringify(bodyJson)
-  })
-
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      ...CORS_HEADERS,
-      'content-type': response.headers.get('content-type') || 'text/event-stream',
-      'cache-control': 'no-cache'
-    }
-  })
-}
-
-/**
- * Handle TTS speech generation (ElevenLabs, OpenAI TTS).
- */
-async function handleTTS(request: Request, env: Env): Promise<Response> {
-  const bodyText = await request.text()
-  let bodyJson: Record<string, unknown> = {}
   try {
-    bodyJson = JSON.parse(bodyText)
-  } catch {
-    // Fall back
-  }
-
-  const provider = (bodyJson.provider as string) || 'elevenlabs'
-
-  if (provider === 'openai') {
-    if (!env.OPENAI_API_KEY) {
-      return new Response(JSON.stringify({ error: 'OPENAI_API_KEY not configured on Worker' }), {
-        status: 500,
-        headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
-      })
-    }
-
-    delete bodyJson.provider
-
-    const response = await fetch('https://api.openai.com/v1/audio/speech', {
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'authorization': `Bearer ${env.OPENAI_API_KEY}`,
-        'content-type': 'application/json'
+        'x-api-key': env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+        'x-request-id': requestId
       },
-      body: JSON.stringify(bodyJson)
+      body: JSON.stringify(bodyJson),
+      signal: AbortSignal.timeout(DEFAULT_UPSTREAM_TIMEOUT_MS)
     })
 
     return new Response(response.body, {
       status: response.status,
       headers: {
-        ...CORS_HEADERS,
-        'content-type': response.headers.get('content-type') || 'audio/mpeg'
+        ...headers,
+        'content-type': response.headers.get('content-type') || 'text/event-stream',
+        'cache-control': 'no-cache'
       }
     })
+  } catch (err) {
+    return new Response(JSON.stringify({ error: `Claude upstream request failed: ${sanitizeErrorMessage(err)}` }), {
+      status: 502,
+      headers: { ...headers, 'content-type': 'application/json' }
+    })
+  }
+}
+
+/**
+ * Handle TTS speech generation (ElevenLabs, OpenAI TTS).
+ */
+async function handleTTS(
+  request: Request,
+  env: Env,
+  headers: Record<string, string>,
+  requestId: string
+): Promise<Response> {
+  const contentLengthStr = request.headers.get('content-length')
+  if (contentLengthStr && parseInt(contentLengthStr, 10) > MAX_BODY_SIZE_BYTES) {
+    return new Response(JSON.stringify({ error: 'Payload exceeds maximum allowed size (16 MiB)' }), {
+      status: 413,
+      headers: { ...headers, 'content-type': 'application/json' }
+    })
+  }
+
+  const bodyText = await request.text()
+  const val = validateTTSRequestBody(bodyText)
+  if (!val.valid || !val.data) {
+    return new Response(JSON.stringify({ error: val.error || 'Invalid request' }), {
+      status: val.status || 400,
+      headers: { ...headers, 'content-type': 'application/json' }
+    })
+  }
+
+  const { provider, voiceId: reqVoiceId, bodyJson } = val.data
+
+  if (provider === 'openai') {
+    if (!env.OPENAI_API_KEY) {
+      return new Response(JSON.stringify({ error: 'OPENAI_API_KEY not configured on Worker' }), {
+        status: 500,
+        headers: { ...headers, 'content-type': 'application/json' }
+      })
+    }
+
+    delete bodyJson.provider
+
+    try {
+      const response = await fetch('https://api.openai.com/v1/audio/speech', {
+        method: 'POST',
+        headers: {
+          'authorization': `Bearer ${env.OPENAI_API_KEY}`,
+          'content-type': 'application/json',
+          'x-request-id': requestId
+        },
+        body: JSON.stringify(bodyJson),
+        signal: AbortSignal.timeout(DEFAULT_UPSTREAM_TIMEOUT_MS)
+      })
+
+      return new Response(response.body, {
+        status: response.status,
+        headers: {
+          ...headers,
+          'content-type': response.headers.get('content-type') || 'audio/mpeg'
+        }
+      })
+    } catch (err) {
+      return new Response(JSON.stringify({ error: `OpenAI TTS upstream request failed: ${sanitizeErrorMessage(err)}` }), {
+        status: 502,
+        headers: { ...headers, 'content-type': 'application/json' }
+      })
+    }
   }
 
   // Default: ElevenLabs
   if (!env.ELEVENLABS_API_KEY) {
     return new Response(JSON.stringify({ error: 'ELEVENLABS_API_KEY not configured on Worker' }), {
       status: 500,
-      headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
+      headers: { ...headers, 'content-type': 'application/json' }
     })
   }
 
-  const voiceId = (bodyJson.voiceId as string) || env.ELEVENLABS_VOICE_ID || 'kPzsL2i3teMYv0FxEYQ6'
+  const voiceId = reqVoiceId || env.ELEVENLABS_VOICE_ID || 'kPzsL2i3teMYv0FxEYQ6'
   delete bodyJson.provider
   delete bodyJson.voiceId
 
-  const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
-    method: 'POST',
-    headers: {
-      'xi-api-key': env.ELEVENLABS_API_KEY,
-      'content-type': 'application/json',
-      'accept': 'audio/mpeg'
-    },
-    body: JSON.stringify(bodyJson)
-  })
+  try {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: 'POST',
+      headers: {
+        'xi-api-key': env.ELEVENLABS_API_KEY,
+        'content-type': 'application/json',
+        'accept': 'audio/mpeg',
+        'x-request-id': requestId
+      },
+      body: JSON.stringify(bodyJson),
+      signal: AbortSignal.timeout(DEFAULT_UPSTREAM_TIMEOUT_MS)
+    })
 
-  return new Response(response.body, {
-    status: response.status,
-    headers: {
-      ...CORS_HEADERS,
-      'content-type': response.headers.get('content-type') || 'audio/mpeg'
-    }
-  })
+    return new Response(response.body, {
+      status: response.status,
+      headers: {
+        ...headers,
+        'content-type': response.headers.get('content-type') || 'audio/mpeg'
+      }
+    })
+  } catch (err) {
+    return new Response(JSON.stringify({ error: `ElevenLabs TTS upstream request failed: ${sanitizeErrorMessage(err)}` }), {
+      status: 502,
+      headers: { ...headers, 'content-type': 'application/json' }
+    })
+  }
 }
 
 /**
  * Obtain temporary short-lived AssemblyAI real-time WebSocket token.
  */
-async function handleTranscribeToken(env: Env): Promise<Response> {
+async function handleTranscribeToken(
+  env: Env,
+  headers: Record<string, string>,
+  requestId: string
+): Promise<Response> {
   if (!env.ASSEMBLYAI_API_KEY) {
     return new Response(JSON.stringify({ error: 'ASSEMBLYAI_API_KEY not configured on Worker' }), {
       status: 500,
-      headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
+      headers: { ...headers, 'content-type': 'application/json' }
     })
   }
 
-  const response = await fetch('https://streaming.assemblyai.com/v3/token?expires_in_seconds=480', {
-    method: 'GET',
-    headers: {
-      'authorization': env.ASSEMBLYAI_API_KEY
+  try {
+    const response = await fetch('https://streaming.assemblyai.com/v3/token?expires_in_seconds=480', {
+      method: 'GET',
+      headers: {
+        'authorization': env.ASSEMBLYAI_API_KEY,
+        'x-request-id': requestId
+      },
+      signal: AbortSignal.timeout(DEFAULT_UPSTREAM_TIMEOUT_MS)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      return new Response(JSON.stringify({ error: sanitizeErrorMessage(errorText) }), {
+        status: response.status,
+        headers: { ...headers, 'content-type': 'application/json' }
+      })
     }
-  })
 
-  if (!response.ok) {
-    const errorText = await response.text()
-    return new Response(errorText, {
-      status: response.status,
-      headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
+    const data = await response.text()
+    return new Response(data, {
+      status: 200,
+      headers: { ...headers, 'content-type': 'application/json' }
+    })
+  } catch (err) {
+    return new Response(JSON.stringify({ error: `AssemblyAI upstream request failed: ${sanitizeErrorMessage(err)}` }), {
+      status: 502,
+      headers: { ...headers, 'content-type': 'application/json' }
     })
   }
-
-  const data = await response.text()
-  return new Response(data, {
-    status: 200,
-    headers: { ...CORS_HEADERS, 'content-type': 'application/json' }
-  })
 }

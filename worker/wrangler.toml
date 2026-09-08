@@ -5,3 +5,14 @@ compatibility_date = "2024-01-01"
 [vars]
 ELEVENLABS_VOICE_ID = "kPzsL2i3teMYv0FxEYQ6"
 
+[env.staging]
+name = "pip-proxy-staging"
+
+[env.staging.vars]
+ELEVENLABS_VOICE_ID = "kPzsL2i3teMYv0FxEYQ6"
+
+[env.production]
+name = "pip-proxy-production"
+
+[env.production.vars]
+ELEVENLABS_VOICE_ID = "kPzsL2i3teMYv0FxEYQ6"

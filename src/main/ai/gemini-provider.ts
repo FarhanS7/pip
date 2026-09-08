@@ -15,6 +15,7 @@ import { AIProvider, VisionPromptPayload } from './ai-provider'
 import { AIProviderError } from '../errors'
 import { buildSystemPrompt } from './system-prompt-builder'
 import { createLogger } from '../logger'
+import { getAppConfig } from '../config'
 
 const log = createLogger('gemini-provider')
 
@@ -27,12 +28,13 @@ export class GeminiProvider implements AIProvider {
   private readonly sharedSecret: string
 
   constructor(
-    workerUrl: string = process.env.PIP_WORKER_URL || 'http://127.0.0.1:8787',
-    sharedSecret: string = process.env.PIP_SHARED_SECRET || 'your-shared-secret-placeholder',
+    workerUrl?: string,
+    sharedSecret?: string,
     private readonly model: string = ''
   ) {
-    this.workerUrl = workerUrl
-    this.sharedSecret = sharedSecret
+    const config = getAppConfig()
+    this.workerUrl = (workerUrl || config.workerUrl).replace(/\/+$/, '')
+    this.sharedSecret = sharedSecret ?? config.sharedSecret
   }
 
   public async *streamChat(payload: VisionPromptPayload): AsyncIterableIterator<string> {
