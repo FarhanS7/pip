@@ -12,6 +12,7 @@
     "!node_modules"
   ],
   "asar": true,
+  "npmRebuild": false,
   "compression": "maximum",
   "win": {
     "target": [
