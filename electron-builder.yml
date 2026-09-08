@@ -21,12 +21,10 @@
         "arch": ["x64"]
       }
     ],
-    "icon": "resources/icon.ico",
     "publisherName": "Pip"
   },
   "mac": {
     "target": ["dmg"],
-    "icon": "resources/icon.icns",
     "category": "public.app-category.utilities"
   },
   "nsis": {
@@ -37,8 +35,6 @@
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true,
     "runAfterFinish": true,
-    "installerIcon": "resources/icon.ico",
-    "uninstallerIcon": "resources/icon.ico",
     "artifactName": "Pip-Setup-${version}.${ext}"
   },
   "publish": {
