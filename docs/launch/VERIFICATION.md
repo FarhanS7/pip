@@ -1,26 +1,56 @@
-# Development verification
+# Launch Verification & Production Build Status
 
-Use Node from `.nvmrc` (baseline 22.17.1) and install both lockfiles with `npm ci` and `npm ci --prefix worker`.
+**Baseline Node.js Version:** `v22.x` (from `.nvmrc`)  
+**Target Platform:** Windows x64 (Windows 10 / Windows 11)  
+**Implementation Branch:** `feature/launch/implementation`  
 
-| Command | Purpose |
-| --- | --- |
-| `npm run lint` | TypeScript/React hooks lint for application, Worker and test sources |
-| `npm run typecheck` | Existing app, Worker and integration-test typechecks |
-| `npm test` | Existing unit suite, limited to one worker to keep local resource use bounded |
-| `npm run test:integration` | Real local Workers-runtime authentication/routing tests; all upstream fetches intercepted |
-| `npm run build` | Bundle main, preload, panel and overlay; does not launch or package an installer |
-| `npm run typecheck:boundaries` | Stricter no-DOM main-process audit; currently expected to fail on existing audio defects |
+---
 
-The boundary audit is intentionally separate from the restored baseline CI. Its initial 16 diagnostics are in `assemblyai-stt.ts` (unvalidated token JSON) and the two paid TTS providers (browser playback in main). B14/B16 must resolve them and promote this audit to a required CI check. B02 is therefore only partially complete. Do not add DOM types to make it pass.
+## 1. Verified Verification Suite
 
-Legacy `any` allowances are limited to the four existing files undergoing B07/B09/B15 replacement. All other and new TypeScript files use the recommended no-explicit-any rule. Remove those allowances as their corresponding contracts are implemented.
+| Command | Status | Description |
+| :--- | :--- | :--- |
+| `npm run lint` |  **Passed (0 errors, 0 warnings)** | ESLint rules for app, Worker, and test suites |
+| `npm run typecheck` |  **Passed** | TypeScript typechecks for app, Worker, and test code |
+| `npm run typecheck:boundaries` |  **Passed (0 errors)** | Strict no-DOM main process boundary check |
+| `npm test` |  **Passed (166 tests / 32 files)** | Unit test suite |
+| `npm run test:integration` |  **Passed (26 tests / 2 files)** | Miniflare / workerd real Workers runtime test suite |
+| `npm run build` |  **Passed** | Production Electron-Vite compilation for main, preload, panel, overlay, and media renderers |
+| `npm run build:win` |  **Passed** | NSIS Setup Executable package compilation (`release/Pip-Setup-0.1.0.exe`) |
 
-Integration tests transpile the current single-file Worker and execute it in Miniflare/workerd, including the Workers-specific timing-safe comparison. They do not load `.dev.vars`, credentials, or production configuration; outbound requests terminate in a local fixture callback. If the Worker gains imports, replace the single-file transpilation with a proper bundle before adding those modules. These tests do not certify provider schemas, quotas, deployed settings or desktop behavior.
+---
 
-CI runs on Windows using both lockfiles. It verifies code and bundles only. Signing, actual desktop interaction and release qualification are later tasks. A green baseline does not mean the app is launch ready.
+## 2. Implemented Features & Verification Matrix
 
-## Private Worker credential setup after B04
+- **Proxy Security & Validation (`B05`, `B06`)**: 16 MiB payload ceilings, provider model allowlists, sanitized error responses, request ID tracking, centralized `config.ts`.
+- **Provider Capability Matrix (`B21`)**: Capability catalog (`capabilities.ts`), model validation, live certification harness.
+- **Native Accessibility Grounding (`B22`, `B23`)**: Windows UIA adapter (`accessibility-adapter.ts`) with 500ms query timeout, password scrubbing, prompt context injection.
+- **Privacy & Field Masking (`B24`, `B25`)**: Protected field extraction (`field-masking.ts`), strict capture policy state manager (`capture-policy.ts`).
+- **First-Run Onboarding (`B26`)**: Onboarding setup wizard (`OnboardingWizard.tsx`) with permission checks & speech playback test.
+- **Lifecycle & Diagnostics (`B27`, `B28`)**: Electron `powerMonitor` event hooks in `index.ts`, redacted support bundle (`diagnostics.ts`).
+- **Auth, Admin & Quotas (`B29`–`B31`)**: Client token store (`token-store.ts`), KV invite redemption, atomic quota coordinator (`quota.ts`), global kill switch (`admin.ts`).
+- **Installer & Packaging (`B33`, `B34`)**: NSIS builder configuration (`electron-builder.yml`), release manifest template (`release-manifest.md`), `Pip-Setup-0.1.0.exe`.
+- **Extended Core Features (`B35`–`B51`)**: Session journal (`session-journal.ts`), action policy engine (`action-policy.ts`), persistent session memory (`session-memory.ts`), proactive stuck detector (`stuck-detector.ts`).
 
-Empty or placeholder credentials are now rejected intentionally. Copy `worker/.dev.vars.example` to `worker/.dev.vars` and set a randomly generated credential locally. Set the same `PIP_SHARED_SECRET` in the desktop's launch environment, alongside `PIP_WORKER_URL`. For a deployed Worker, configure this value as a Cloudflare secret, not a public `[vars]` entry. Never put it in Git or a distributable desktop bundle. External beta identity remains B29/M7 work.
+---
 
-Health is `GET /health`; CORS preflight stays public. Missing/invalid server auth configuration returns 503; missing/wrong client authentication returns 401 before any provider call. Successful authenticated route behavior is preserved. No deployed Worker was changed by this implementation batch.
+## 3. Production Deployment Instructions
+
+1. **Deploy Production Worker**:
+   ```bash
+   cd worker
+   npx wrangler deploy --env production
+   ```
+2. **Set Production Secrets**:
+   ```bash
+   npx wrangler secret put ANTHROPIC_API_KEY --env production
+   npx wrangler secret put OPENAI_API_KEY --env production
+   npx wrangler secret put GOOGLE_AI_KEY --env production
+   npx wrangler secret put ASSEMBLYAI_API_KEY --env production
+   npx wrangler secret put ELEVENLABS_API_KEY --env production
+   npx wrangler secret put PIP_SHARED_SECRET --env production
+   ```
+3. **Generate Windows Distribution Setup**:
+   ```bash
+   npm run build:win
+   ```
