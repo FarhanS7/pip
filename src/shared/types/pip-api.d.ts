@@ -20,6 +20,7 @@ export interface PipAPI {
   onStopSpeaking: (callback: (payload: { requestId: number }) => void) => () => void
   mediaReady: () => Promise<void>
   reportPlayback: (requestId: number, status: 'ended' | 'error') => Promise<void>
+
   // Settings
   getSettings: () => Promise<SettingsPayload>
   getSettingsNotice: () => Promise<string | null>
@@ -37,6 +38,17 @@ export interface PipAPI {
   onPowerLevelChanged: (callback: (payload: AudioPowerLevelPayload) => void) => () => void
   onPointDetected: (callback: (payload: PointDetectedPayload) => void) => () => void
   onTextChunk: (callback: (payload: TextChunkPayload) => void) => () => void
+
+  // Permissions & Onboarding (Task B26)
+  getPermissions: () => Promise<{ microphone: string; accessibility: string; screenCapture: string }>
+  requestPermission: (permissionType: string) => Promise<{ success: boolean; reason?: string }>
+  completeOnboarding: () => Promise<void>
+
+  // Diagnostics & Privacy (Task B28)
+  collectDiagnostics: () => Promise<unknown>
+  getCapturePolicy: () => Promise<unknown>
+  pauseCapture: () => Promise<void>
+  resumeCapture: () => Promise<void>
 }
 
 declare global {
@@ -44,4 +56,3 @@ declare global {
     pipAPI?: PipAPI
   }
 }
-

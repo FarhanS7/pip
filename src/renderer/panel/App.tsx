@@ -1,8 +1,8 @@
 /**
  * Panel App — Control Panel Root Component
  *
- * Mounts StatusHeader, VoiceToggleButton, ProviderSelectors, and HotkeyConfigurator.
- * Wires configuration state persistence and IPC events.
+ * Mounts StatusHeader, VoiceToggleButton, ProviderSelectors, HotkeyConfigurator, and OnboardingWizard.
+ * Wires configuration state persistence, onboarding flow, and IPC events.
  *
  * References:
  *   PHASE_0_ARCHITECTURE.md §0.2 (renderer/panel module)
@@ -15,6 +15,7 @@ import { StatusHeader } from './components/StatusHeader'
 import { VoiceToggleButton } from './components/VoiceToggleButton'
 import { ProviderSelectors } from './components/ProviderSelectors'
 import { HotkeyConfigurator } from './components/HotkeyConfigurator'
+import { OnboardingWizard } from './components/OnboardingWizard'
 import { SettingsPayload } from '../../shared/types/ipc'
 
 import { DEFAULT_SETTINGS } from '../../shared/settings'
@@ -26,6 +27,7 @@ function App(): React.JSX.Element {
   const [request, setRequest] = useState('')
   const [inputError, setInputError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [showOnboarding, setShowOnboarding] = useState(false)
 
   useEffect(() => {
     if (!window.pipAPI) return
@@ -90,9 +92,34 @@ function App(): React.JSX.Element {
     }
   }
 
+  const handleCompleteOnboarding = () => {
+    setShowOnboarding(false)
+    if (window.pipAPI) {
+      void window.pipAPI.completeOnboarding()
+    }
+  }
+
   return (
     <div className="panel-container">
       {settingsError && <p role="alert">{settingsError}</p>}
+      
+      {/* Onboarding Wizard Header Button & Modal View */}
+      {showOnboarding ? (
+        <OnboardingWizard
+          settings={settings}
+          onUpdateSetting={handleUpdateSetting}
+          onComplete={handleCompleteOnboarding}
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowOnboarding(true)}
+          style={{ marginBottom: '12px', fontSize: '0.85rem', background: '#313244', color: '#89b4fa', border: '1px solid #45475a', padding: '4px 8px', borderRadius: '4px' }}
+        >
+          ✨ Launch Setup Wizard
+        </button>
+      )}
+
       {/* Real-Time Status Header */}
       <StatusHeader voiceState={voiceState} />
 

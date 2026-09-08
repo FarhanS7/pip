@@ -43,6 +43,18 @@ const pipAPI: PipAPI = {
   cancelTurn: () => ipcRenderer.invoke(IpcChannel.CANCEL_TURN),
   onPowerLevelChanged: (callback) => subscribe(IpcChannel.AUDIO_POWER_LEVEL, callback),
   onPointDetected: (callback) => subscribe(IpcChannel.CURSOR_POSITION, callback),
-  onTextChunk: (callback) => subscribe(IpcChannel.AI_RESPONSE_CHUNK, callback)
+  onTextChunk: (callback) => subscribe(IpcChannel.AI_RESPONSE_CHUNK, callback),
+
+  // Permissions & Onboarding (Task B26)
+  getPermissions: () => ipcRenderer.invoke(IpcChannel.PERMISSIONS_GET),
+  requestPermission: (permissionType) => ipcRenderer.invoke(IpcChannel.PERMISSIONS_REQUEST, permissionType),
+  completeOnboarding: () => ipcRenderer.invoke(IpcChannel.ONBOARDING_COMPLETE),
+
+  // Diagnostics & Privacy (Task B28)
+  collectDiagnostics: () => ipcRenderer.invoke(IpcChannel.DIAGNOSTICS_COLLECT),
+  getCapturePolicy: () => ipcRenderer.invoke(IpcChannel.CAPTURE_POLICY_GET),
+  pauseCapture: () => ipcRenderer.invoke(IpcChannel.CAPTURE_PAUSE),
+  resumeCapture: () => ipcRenderer.invoke(IpcChannel.CAPTURE_RESUME)
 }
+
 contextBridge.exposeInMainWorld('pipAPI', pipAPI)
