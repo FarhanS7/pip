@@ -7,7 +7,7 @@
  * References: PHASE_0_ARCHITECTURE.md §0.1 (Modular Monolith — Electron App)
  */
 
-import { app, session } from 'electron'
+import { app, powerMonitor, session, screen } from 'electron'
 import { createLogger } from './logger'
 import { registerIpcHandlers } from './ipc/handlers'
 import { installPermissionPolicy } from './ipc/security'
@@ -19,6 +19,7 @@ import { initOrchestrator, destroyOrchestrator } from './orchestrator'
 import { createMediaWindow, destroyMediaWindow } from './windows/media-window'
 import { voiceStateMachine } from './state/voice-state-machine'
 import { initSettingsStore, getSettings, setSettingsEffect, reportSettingsNotice } from './state/settings'
+import { pauseCapture, resumeCapture } from './privacy/capture-policy'
 
 const log = createLogger('shell')
 
@@ -71,6 +72,34 @@ app.whenReady().then(async () => {
 
   // Initialize overlay windows (one per monitor)
   createOverlayWindows()
+
+  // ── Power Monitor: pause capture on lock/suspend ──
+  powerMonitor.on('suspend', () => {
+    log.info('System suspending — pausing capture')
+    pauseCapture('system-suspend')
+  })
+
+  powerMonitor.on('resume', () => {
+    log.info('System resumed — resuming capture')
+    resumeCapture()
+  })
+
+  powerMonitor.on('lock-screen', () => {
+    log.info('Screen locked — pausing capture')
+    pauseCapture('lock-screen')
+  })
+
+  powerMonitor.on('unlock-screen', () => {
+    log.info('Screen unlocked — resuming capture')
+    resumeCapture()
+  })
+
+  // ── Display Changes: reposition overlays ──
+  screen.on('display-metrics-changed', () => {
+    log.info('Display metrics changed — repositioning overlays')
+    destroyAllOverlayWindows()
+    createOverlayWindows()
+  })
 
 })
 
