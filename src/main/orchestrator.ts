@@ -13,6 +13,8 @@ import { conversationHistory } from './state/conversation'
 import { IpcChannel } from './ipc/channels'
 import { createLogger } from './logger'
 import { waitForAudio } from './audio/wait-for-audio'
+import { queryAccessibilityTree, formatAccessibilityForPrompt } from './accessibility/accessibility-adapter'
+import { isCaptureAllowed } from './privacy/capture-policy'
 
 const log = createLogger('orchestrator')
 interface Turn {
@@ -189,19 +191,36 @@ export class Orchestrator {
       this.cancel('no-transcript'); return
     }
     let images: { screenIndex: number; jpegBase64: string }[] = []
-    try {
-      const screens = await captureAllScreens()
-      if (!this.owns(turn)) return
-      if (screens.length > 4 || screens.reduce((sum, screen) => sum + screen.jpegBase64.length, 0) > 8 * 1024 * 1024) {
-        this.cancel('capture-limit'); return
+
+    // Check capture policy before attempting screen capture
+    if (!isCaptureAllowed()) {
+      log.info('Screen capture paused or blocked by policy', { turnId: turn.id })
+    } else {
+      try {
+        const screens = await captureAllScreens()
+        if (!this.owns(turn)) return
+        if (screens.length > 4 || screens.reduce((sum, screen) => sum + screen.jpegBase64.length, 0) > 8 * 1024 * 1024) {
+          this.cancel('capture-limit'); return
+        }
+        images = screens.map(screen => ({ screenIndex: screen.screenIndex, jpegBase64: screen.jpegBase64 }))
+        displays = screens.map(screen => ({
+          displayId: screen.displayId, screenIndex: screen.screenIndex, bounds: screen.bounds, isPrimary: screen.isPrimary, imageSize: screen.imageSize
+        }))
+      } catch (error) {
+        if (!this.owns(turn)) return
+        log.warn('Screen capture failed', { turnId: turn.id, error: String(error) })
       }
-      images = screens.map(screen => ({ screenIndex: screen.screenIndex, jpegBase64: screen.jpegBase64 }))
-      displays = screens.map(screen => ({
-        displayId: screen.displayId, screenIndex: screen.screenIndex, bounds: screen.bounds, isPrimary: screen.isPrimary, imageSize: screen.imageSize
-      }))
-    } catch (error) {
+    }
+    if (!this.owns(turn)) return
+
+    // Query accessibility tree for enhanced grounding
+    let accessibilityTreeText = ''
+    try {
+      const axSnapshot = await queryAccessibilityTree()
       if (!this.owns(turn)) return
-      log.warn('Screen capture failed', { turnId: turn.id, error: String(error) })
+      accessibilityTreeText = formatAccessibilityForPrompt(axSnapshot)
+    } catch (error) {
+      log.debug('Accessibility query skipped', { error: String(error) })
     }
     if (!this.owns(turn)) return
     const query = turn.utterance.trim()
@@ -215,7 +234,7 @@ export class Orchestrator {
     voiceStateMachine.transitionTo('responding', 'ai-stream-start')
     let response = ''
     for await (const chunk of provider.streamChat({
-      messages, images, systemPrompt: buildSystemPrompt({ displays }), signal: turn.controller.signal
+      messages, images, systemPrompt: buildSystemPrompt({ displays, accessibilityTreeText }), signal: turn.controller.signal
     })) {
       if (!this.owns(turn)) return
       response += chunk
