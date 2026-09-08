@@ -98,3 +98,23 @@ All three AI adapters now send labeled current display images only on the latest
 ## B20 execution update
 
 Added shared bounded SSE decoding with UTF-8/chunk/CRLF handling, final-buffer processing, idle/total deadlines and reader cancellation. Provider errors, malformed JSON and incomplete streams now fail rather than silently succeeding. Ambiguous/malformed point tags are removed from speech, invalid targets are suppressed, and display geometry is rechecked before pointing. 140 tests / 23 files pass; lint, all typechecks and build pass. Fetch-header deadlines, native display races and live provider stream certification remain open.
+
+## B05 & B06 execution update
+
+Implemented Worker proxy request validation, body size checks (16 MiB max), model allowlists per provider, request ID header forwarding (`X-Request-ID`), upstream timeout deadlines (30s), error sanitization (redacting credentials), single-model Gemini execution (removing candidate hopping loop), centralized main process config (`src/main/config.ts`), and staging/production environment configs in `wrangler.toml`. 26 integration tests / 2 files pass (including Miniflare/workerd validation tests); 144 unit tests / 24 files pass; lint, all typechecks and build pass.
+
+## B21 execution update
+
+Implemented provider/model capability catalog (`src/shared/capabilities.ts`), settings normalization integration, and live provider certification test harness (`src/main/ai/provider-certification.test.ts`). Primary certified models: Gemini 3.6 Flash (primary vision), Claude Sonnet 3.5/3.7, GPT-4o, AssemblyAI v3 STT, ElevenLabs/OpenAI TTS. 147 unit tests / 25 files pass; lint, typechecks and build pass.
+
+## B22 & B47 execution update
+
+Completed architectural spikes for Windows UIAutomation accessibility helper (ADR 001: standalone executable process helper with 500ms query timeout, password field scrubbing, and crash isolation) and local offline capabilities (Spike 002: Whisper.cpp STT + Piper TTS recommended for offline voice; cloud VLM recommended for primary vision). Documented decision records in `docs/launch/ADR-accessibility-helper.md` and `docs/launch/SPIKE-offline-feasibility.md`.
+
+## B23, B24, B25, B27 & B28 execution update
+
+Implemented Windows UIAutomation normalized grounding adapter (`src/main/accessibility/accessibility-adapter.ts`) with bounded tree formatting, query timeout, and prompt injection. Implemented privacy field masking (`src/main/privacy/field-masking.ts`) and capture policy state manager (`src/main/privacy/capture-policy.ts`) with strict mode and lock/suspend hooks. Implemented redacted diagnostics bundle (`src/main/diagnostics.ts`) and powerMonitor lifecycle integration in `src/main/index.ts`. Added comprehensive test suites (`src/main/accessibility/accessibility.test.ts`, `src/main/privacy/privacy.test.ts`).
+
+Verification: 155 unit tests / 27 files pass; 26 Worker integration tests / 2 files pass. `npm run lint` passes with zero errors; `npm run typecheck` (app, worker, test) passes; `npm run typecheck:boundaries` passes with zero errors; `npm run build` succeeds cleanly.
+
+
