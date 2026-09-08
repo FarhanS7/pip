@@ -2,6 +2,7 @@
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
   "appId": "com.pip.app",
   "productName": "Pip",
+  "copyright": "Copyright © 2026 Pip",
   "directories": {
     "buildResources": "resources",
     "output": "release"
@@ -10,9 +11,17 @@
     "out/**/*",
     "!node_modules"
   ],
+  "asar": true,
+  "compression": "maximum",
   "win": {
-    "target": ["nsis"],
-    "icon": "resources/icon.ico"
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "resources/icon.ico",
+    "publisherName": "Pip"
   },
   "mac": {
     "target": ["dmg"],
@@ -20,7 +29,19 @@
     "category": "public.app-category.utilities"
   },
   "nsis": {
-    "oneClick": true,
-    "perMachine": false
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "deleteAppDataOnUninstall": false,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "runAfterFinish": true,
+    "installerIcon": "resources/icon.ico",
+    "uninstallerIcon": "resources/icon.ico",
+    "artifactName": "Pip-Setup-${version}.${ext}"
+  },
+  "publish": {
+    "provider": "generic",
+    "url": "https://pip-updates.example.com"
   }
 }
