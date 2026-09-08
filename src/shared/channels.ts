@@ -78,4 +78,20 @@ export enum IpcChannel {
   PERMISSIONS_GET = 'permissions:get',
   /** Renderer → Main: Request a specific permission */
   PERMISSIONS_REQUEST = 'permissions:request',
+
+  // ── Diagnostics ─────────────────────────────────────────────────────
+  /** Renderer → Main: Collect redacted diagnostics bundle */
+  DIAGNOSTICS_COLLECT = 'diagnostics:collect',
+
+  // ── Capture Policy ──────────────────────────────────────────────────
+  /** Renderer → Main: Get current capture policy state */
+  CAPTURE_POLICY_GET = 'capture:policy-get',
+  /** Renderer → Main: Pause screen capture */
+  CAPTURE_PAUSE = 'capture:pause',
+  /** Renderer → Main: Resume screen capture */
+  CAPTURE_RESUME = 'capture:resume',
+
+  // ── Onboarding ──────────────────────────────────────────────────────
+  /** Renderer → Main: Mark onboarding as complete */
+  ONBOARDING_COMPLETE = 'onboarding:complete',
 }

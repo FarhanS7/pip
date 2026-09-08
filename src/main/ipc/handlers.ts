@@ -159,6 +159,34 @@ export function registerIpcHandlers(): void {
     return { success: false, reason: 'Not yet implemented' }
   })
 
+  // ── Diagnostics ────────────────────────────────────────────────────
+  handle(IpcChannel.DIAGNOSTICS_COLLECT, async () => {
+    const { collectDiagnostics } = await import('../diagnostics')
+    return collectDiagnostics()
+  })
+
+  // ── Capture Policy ─────────────────────────────────────────────────
+  handle(IpcChannel.CAPTURE_POLICY_GET, async () => {
+    const { getCapturePolicy } = await import('../privacy/capture-policy')
+    return getCapturePolicy()
+  })
+
+  handle(IpcChannel.CAPTURE_PAUSE, async () => {
+    const { pauseCapture } = await import('../privacy/capture-policy')
+    pauseCapture('user-paused')
+  })
+
+  handle(IpcChannel.CAPTURE_RESUME, async () => {
+    const { resumeCapture } = await import('../privacy/capture-policy')
+    resumeCapture()
+  })
+
+  // ── Onboarding ─────────────────────────────────────────────────────
+  handle(IpcChannel.ONBOARDING_COMPLETE, async () => {
+    log.info('Onboarding completed')
+    return { success: true }
+  })
+
   log.info('IPC handlers registered', {
     handlerCount: Object.keys(IpcChannel).length
   })
