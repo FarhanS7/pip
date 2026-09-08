@@ -13,7 +13,10 @@ function transpile(filePath: string): string {
 
 const modules = [
   { type: 'ESModule' as const, path: 'index.js', contents: transpile('worker/src/index.ts') },
-  { type: 'ESModule' as const, path: 'validation.js', contents: transpile('worker/src/validation.ts') }
+  { type: 'ESModule' as const, path: 'validation.js', contents: transpile('worker/src/validation.ts') },
+  { type: 'ESModule' as const, path: 'admin.js', contents: transpile('worker/src/admin.ts') },
+  { type: 'ESModule' as const, path: 'auth.js', contents: transpile('worker/src/auth.ts') },
+  { type: 'ESModule' as const, path: 'quota.js', contents: transpile('worker/src/quota.ts') }
 ]
 
 const protectedRoutes = [

@@ -18,6 +18,7 @@ import {
   validateTTSRequestBody,
   sanitizeErrorMessage
 } from './validation.js'
+import { isKillSwitchActive } from './admin.js'
 
 interface Env {
   ANTHROPIC_API_KEY?: string
@@ -56,6 +57,13 @@ export default {
           status: 200,
           headers: { ...responseHeaders, 'content-type': 'application/json' }
         })
+      }
+
+      if (await isKillSwitchActive(env)) {
+        return new Response(
+          JSON.stringify({ error: 'Service temporarily disabled by administration' }),
+          { status: 503, headers: { ...responseHeaders, 'content-type': 'application/json' } }
+        )
       }
 
       const expectedSecret = env.PIP_SHARED_SECRET
