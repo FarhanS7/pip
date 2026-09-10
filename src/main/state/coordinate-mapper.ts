@@ -9,7 +9,8 @@ export function mapToGlobalScreenCoordinates(point: Point, index: number, displa
   const display = displays.find(item => item.screenIndex === index)
   if (!display || !Number.isSafeInteger(index) || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null
   const size = display.imageSize
-  if (!size || size.width <= 0 || size.height <= 0 || point.x < 0 || point.y < 0 || point.x >= size.width || point.y >= size.height) return null
+  if (!size || size.width <= 0 || size.height <= 0) return null
+  if (point.x < 0 || point.y < 0 || point.x >= size.width || point.y >= size.height) return null
   const bounds = display.bounds
   if (![bounds.x, bounds.y, bounds.width, bounds.height, size.width, size.height].every(Number.isFinite) || bounds.width <= 0 || bounds.height <= 0) return null
   const localX = Math.min(bounds.width - 1, Math.round(point.x * bounds.width / size.width))

@@ -18,7 +18,7 @@ export interface StuckState {
 const DEFAULT_COOLDOWN_MS = 60000 // 1 minute cooldown between proactive prompts
 const FAILURE_THRESHOLD = 3 // Trigger after 3 consecutive failures
 
-let state: StuckState = {
+const state: StuckState = {
   failureCount: 0,
   lastFailureTime: 0,
   snoozedUntil: 0

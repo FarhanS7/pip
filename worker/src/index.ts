@@ -28,6 +28,8 @@ interface Env {
   ELEVENLABS_API_KEY?: string
   ELEVENLABS_VOICE_ID?: string
   PIP_SHARED_SECRET?: string
+  ADMIN_KV?: KVNamespace
+  ADMIN_SECRET?: string
 }
 
 const CORS_HEADERS = {

@@ -56,7 +56,10 @@ const panelChannels = new Set<string>([
   IpcChannel.SETTINGS_SET, IpcChannel.SETTINGS_RESET, IpcChannel.SETTINGS_NOTICE,
   IpcChannel.START_RECORDING, IpcChannel.STOP_RECORDING, IpcChannel.APP_QUIT,
   IpcChannel.CURSOR_TOGGLE, IpcChannel.CURSOR_VISIBILITY_GET,
-  IpcChannel.PERMISSIONS_GET, IpcChannel.PERMISSIONS_REQUEST
+  IpcChannel.PERMISSIONS_GET, IpcChannel.PERMISSIONS_REQUEST,
+  IpcChannel.DIAGNOSTICS_COLLECT,
+  IpcChannel.CAPTURE_POLICY_GET, IpcChannel.CAPTURE_PAUSE, IpcChannel.CAPTURE_RESUME,
+  IpcChannel.ONBOARDING_COMPLETE
 ])
 
 export function authorizeIpc(event: IpcMainInvokeEvent, channel: string): void {

@@ -1,8 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   createActionProposal,
-  validateActionProposal,
-  DEFAULT_ACTION_POLICY
+  validateActionProposal
 } from './action-policy'
 
 describe('Permissioned Action Policy Engine (Task B39)', () => {

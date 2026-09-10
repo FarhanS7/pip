@@ -9,9 +9,15 @@
   },
   "files": [
     "out/**/*",
-    "!node_modules"
+    "node_modules/ws/**/*",
+    "node_modules/uiohook-napi/**/*"
   ],
   "asar": true,
+  "asarUnpacked": [
+    "node_modules/ws/**/*",
+    "node_modules/uiohook-napi/**/*",
+    "native/**/*"
+  ],
   "npmRebuild": false,
   "compression": "maximum",
   "win": {

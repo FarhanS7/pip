@@ -53,6 +53,15 @@ async function loadSettings(): Promise<void> {
       throw new Error('Unsupported settings version')
     }
     const normalized = normalizeSettings(raw)
+    if (normalized.selectedAIProvider === 'claude' && !process.env.ANTHROPIC_API_KEY) {
+      log.info('Anthropic API key not detected in environment, falling back to Gemini provider')
+      normalized.selectedAIProvider = 'gemini'
+      normalized.selectedAIModel = PROVIDER_DEFAULT_MODELS.gemini
+    }
+    if (normalized.selectedTTSProvider === 'elevenlabs' && !process.env.ELEVENLABS_API_KEY) {
+      log.info('ElevenLabs API key not detected in environment, falling back to Browser TTS provider')
+      normalized.selectedTTSProvider = 'browser'
+    }
     const document = { ...normalized, schemaVersion: SCHEMA_VERSION, ...(raw.__internal__ === undefined ? {} : { __internal__: raw.__internal__ }) }
     const changed = raw.schemaVersion !== SCHEMA_VERSION ||
       Object.entries(normalized).some(([key, value]) => raw[key] !== value) ||

@@ -28,7 +28,8 @@ export function getAppConfig(): Readonly<AppConfig> {
       : 'http://127.0.0.1:8787'
 
   const workerUrl = (process.env.PIP_WORKER_URL || defaultWorkerUrl).replace(/\/+$/, '')
-  const sharedSecret = process.env.PIP_SHARED_SECRET || ''
+  const defaultSecret = env === 'dev' ? 'pip-dev-secret-key-2026' : ''
+  const sharedSecret = process.env.PIP_SHARED_SECRET || defaultSecret
 
   cachedConfig = Object.freeze({
     workerUrl,

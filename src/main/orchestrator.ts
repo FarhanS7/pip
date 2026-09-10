@@ -13,8 +13,9 @@ import { conversationHistory } from './state/conversation'
 import { IpcChannel } from './ipc/channels'
 import { createLogger } from './logger'
 import { waitForAudio } from './audio/wait-for-audio'
-import { queryAccessibilityTree, formatAccessibilityForPrompt } from './accessibility/accessibility-adapter'
+import { queryAccessibilityTree, formatAccessibilityForPrompt, AccessibilitySnapshot } from './accessibility/accessibility-adapter'
 import { isCaptureAllowed } from './privacy/capture-policy'
+import { extractProtectedRegions, applyMaskingToBase64, sanitizeAccessibilityText } from './privacy/field-masking'
 
 const log = createLogger('orchestrator')
 interface Turn {
@@ -192,6 +193,19 @@ export class Orchestrator {
     }
     let images: { screenIndex: number; jpegBase64: string }[] = []
 
+    // Query accessibility tree for enhanced grounding & protected region extraction
+    let accessibilityTreeText = ''
+    let axSnapshot: AccessibilitySnapshot | null = null
+    try {
+      axSnapshot = await queryAccessibilityTree()
+      if (!this.owns(turn)) return
+      accessibilityTreeText = sanitizeAccessibilityText(formatAccessibilityForPrompt(axSnapshot))
+    } catch (error) {
+      log.debug('Accessibility query skipped', { error: String(error) })
+    }
+    if (!this.owns(turn)) return
+    const protectedRegions = extractProtectedRegions(axSnapshot)
+
     // Check capture policy before attempting screen capture
     if (!isCaptureAllowed()) {
       log.info('Screen capture paused or blocked by policy', { turnId: turn.id })
@@ -202,7 +216,10 @@ export class Orchestrator {
         if (screens.length > 4 || screens.reduce((sum, screen) => sum + screen.jpegBase64.length, 0) > 8 * 1024 * 1024) {
           this.cancel('capture-limit'); return
         }
-        images = screens.map(screen => ({ screenIndex: screen.screenIndex, jpegBase64: screen.jpegBase64 }))
+        images = screens.map(screen => ({
+          screenIndex: screen.screenIndex,
+          jpegBase64: applyMaskingToBase64(screen.jpegBase64, protectedRegions, screen.imageSize)
+        }))
         displays = screens.map(screen => ({
           displayId: screen.displayId, screenIndex: screen.screenIndex, bounds: screen.bounds, isPrimary: screen.isPrimary, imageSize: screen.imageSize
         }))
@@ -210,17 +227,6 @@ export class Orchestrator {
         if (!this.owns(turn)) return
         log.warn('Screen capture failed', { turnId: turn.id, error: String(error) })
       }
-    }
-    if (!this.owns(turn)) return
-
-    // Query accessibility tree for enhanced grounding
-    let accessibilityTreeText = ''
-    try {
-      const axSnapshot = await queryAccessibilityTree()
-      if (!this.owns(turn)) return
-      accessibilityTreeText = formatAccessibilityForPrompt(axSnapshot)
-    } catch (error) {
-      log.debug('Accessibility query skipped', { error: String(error) })
     }
     if (!this.owns(turn)) return
     const query = turn.utterance.trim()

@@ -58,33 +58,60 @@ function collectProtectedElements(
 }
 
 /**
- * Apply black rectangle masking to a JPEG base64 image buffer.
- * Regions are specified in the image's coordinate space.
- *
- * Note: For the initial implementation, we mark regions for masking
- * and strip the accessibility data. Full pixel-level masking requires
- * native image manipulation which will be added with the native helper.
+ * Apply black rectangle masking to a JPEG base64 image buffer using Electron's nativeImage.
  */
+import * as electronModule from 'electron'
+
 export function applyMaskingToBase64(
   jpegBase64: string,
-  _regions: MaskRegion[],
-  _imageSize: { width: number; height: number }
+  regions: MaskRegion[],
+  _imageSize?: { width: number; height: number }
 ): string {
-  // Phase 1: Return image as-is when no protected regions detected.
-  // Full pixel masking via sharp/canvas will be added with the native helper (B23 full).
-  // For now, the accessibility adapter already scrubs password VALUES from the tree text.
-  if (_regions.length === 0) return jpegBase64
+  if (!jpegBase64 || regions.length === 0) return jpegBase64
 
-  log.info('Protected regions detected for masking', {
-    count: _regions.length,
-    reasons: _regions.map(r => r.reason)
+  log.info('Applying pixel masking to protected regions', {
+    count: regions.length,
+    reasons: regions.map(r => r.reason)
   })
 
-  // TODO B24-full: Apply actual pixel-level black rectangle masking using
-  // Electron's nativeImage or a lightweight image processing library.
-  // For now, we log that masking was requested but cannot modify pixels
-  // without adding a native dependency. The accessibility text is already scrubbed.
-  return jpegBase64
+  try {
+    const nativeImage = electronModule.nativeImage
+    if (!nativeImage || typeof nativeImage.createFromBuffer !== 'function') {
+      log.debug('nativeImage unavailable, skipping pixel manipulation')
+      return jpegBase64
+    }
+
+    const img = nativeImage.createFromBuffer(Buffer.from(jpegBase64, 'base64'))
+    const size = img.getSize()
+    if (size.width === 0 || size.height === 0) return jpegBase64
+
+    const bitmap = img.toBitmap()
+    const imgWidth = size.width
+    const imgHeight = size.height
+
+    for (const region of regions) {
+      const startX = Math.max(0, Math.min(imgWidth, Math.round(region.x)))
+      const startY = Math.max(0, Math.min(imgHeight, Math.round(region.y)))
+      const endX = Math.max(0, Math.min(imgWidth, Math.round(region.x + region.width)))
+      const endY = Math.max(0, Math.min(imgHeight, Math.round(region.y + region.height)))
+
+      for (let y = startY; y < endY; y++) {
+        for (let x = startX; x < endX; x++) {
+          const idx = (y * imgWidth + x) * 4
+          bitmap[idx] = 0       // Red
+          bitmap[idx + 1] = 0   // Green
+          bitmap[idx + 2] = 0   // Blue
+          bitmap[idx + 3] = 255 // Alpha
+        }
+      }
+    }
+
+    const maskedImg = nativeImage.createFromBitmap(bitmap, { width: imgWidth, height: imgHeight })
+    return maskedImg.toJPEG(90).toString('base64')
+  } catch (error) {
+    log.error('Pixel masking failed', { error: String(error) })
+    return jpegBase64
+  }
 }
 
 /**

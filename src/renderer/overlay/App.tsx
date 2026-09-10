@@ -28,8 +28,8 @@ function App(): React.JSX.Element {
   const [responseText, setResponseText] = useState<string>('')
   const [targetRect, setTargetRect] = useState<BoundingBoxRect | null>(null)
   const [targetLabel, setTargetLabel] = useState<string>('')
-  const [cursorEnabled, setCursorEnabled] = useState(false)
-
+  const [cursorEnabled, setCursorEnabled] = useState(true)
+  const [targetOnThisScreen, setTargetOnThisScreen] = useState(true)
 
   useEffect(() => {
     if (window.pipAPI) return subscribeCursorVisibility(window.pipAPI, setCursorEnabled)
@@ -39,19 +39,29 @@ function App(): React.JSX.Element {
     if (!window.pipAPI) return
 
     const unsubscribe = subscribeOverlayEvents(window.pipAPI, {
-      setVoiceState,
+      setVoiceState: (state) => {
+        setVoiceState(state)
+        if (state === 'listening' || state === 'processing') {
+          setTargetRect(null)
+          setTargetOnThisScreen(true)
+        }
+      },
 
       resetResponse: () => {
         setResponseText('')
         setTargetRect(null)
+        setTargetOnThisScreen(true)
       },
       setPowerLevel,
       setPoint: ({ x, y, label }) => {
         const localX = x - window.screenX
         const localY = y - window.screenY
         if (localX < 0 || localY < 0 || localX >= window.innerWidth || localY >= window.innerHeight) {
-          setTargetRect(null); return
+          setTargetRect(null)
+          setTargetOnThisScreen(false)
+          return
         }
+        setTargetOnThisScreen(true)
         setTargetPos({ x: localX, y: localY })
         setTargetLabel(label ?? '')
         setTargetRect({ x: localX - 40, y: localY - 20, width: 80, height: 40 })
@@ -68,11 +78,11 @@ function App(): React.JSX.Element {
       <BoundingBoxHighlight
         rect={targetRect}
         label={targetLabel}
-        isVisible={cursorEnabled && voiceState === 'responding' && targetRect !== null}
+        isVisible={cursorEnabled && targetOnThisScreen && voiceState === 'responding' && targetRect !== null}
       />
 
       {/* Animated Cursor Companion */}
-      {cursorEnabled && <CursorBuddy
+      {cursorEnabled && targetOnThisScreen && <CursorBuddy
         targetX={targetPos.x}
         targetY={targetPos.y}
         voiceState={voiceState}

@@ -56,8 +56,8 @@ When answering, if your explanation involves a specific UI element or location o
 
 CRITICAL RULES:
 - ALWAYS include exactly one [POINT:...] tag at the very end of your response.
-- Always estimate and provide the target (x,y) pixel coordinates of the UI element, button, or window whenever your answer refers to anything visible on screen.
-- The (x,y) coordinates must be relative to the specific display image you are viewing (0,0 is top-left of that display).
+- When asked where something is or to point out an app/icon/window, ALWAYS find its visual position in the screenshot image and provide its exact (x,y) pixel coordinates.
+- The (x,y) coordinates must be relative to the display image dimensions provided in DISPLAY LAYOUT (0,0 is top-left).
 - Keep spoken text concise and conversational — the user is listening to speech synthesis.`
 
   if (options.accessibilityTreeText && options.accessibilityTreeText.trim()) {

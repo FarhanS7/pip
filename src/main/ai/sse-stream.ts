@@ -50,7 +50,15 @@ export async function* readSse(body: ReadableStream<Uint8Array>, signal?: AbortS
 }
 
 export async function* readProviderText(response: Response, provider: 'claude' | 'openai' | 'gemini', signal?: AbortSignal): AsyncGenerator<string> {
-  if (!response.ok || !response.body) { await response.body?.cancel(); throw streamError() }
+  if (!response.ok || !response.body) {
+    let message = 'The AI response could not complete. Please try again.'
+    try {
+      const errText = await response.text()
+      const parsed = JSON.parse(errText) as { error?: string }
+      if (parsed?.error) message = String(parsed.error)
+    } catch { /* use default */ }
+    throw new AIProviderError('AI_STREAM_FAILED', message)
+  }
   let complete = false
   for await (const data of readSse(response.body, signal)) {
     if (data === '[DONE]') { complete = true; break }

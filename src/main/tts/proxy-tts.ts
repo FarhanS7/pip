@@ -42,7 +42,13 @@ export abstract class ProxyTTSProvider implements TTSProvider {
         body: JSON.stringify({ provider: this.provider, ...(this.provider === 'openai' ? { input: text, model: 'tts-1', voice: 'alloy', response_format: 'mp3' } : { text }) })
       })
       if (!response.ok || !response.body || !response.headers.get('content-type')?.toLowerCase().startsWith('audio/mpeg')) {
-        await response.body?.cancel(); throw new Error('Invalid audio response')
+        let errMessage = 'Speech playback could not complete. Please try again.'
+        try {
+          const errText = await response.text()
+          const parsed = JSON.parse(errText) as { error?: string }
+          if (parsed?.error) errMessage = String(parsed.error)
+        } catch { /* default */ }
+        throw new TTSError('TTS_FAILED', errMessage)
       }
       const reader = response.body.getReader()
       const chunks: Uint8Array[] = []
@@ -65,7 +71,8 @@ export abstract class ProxyTTSProvider implements TTSProvider {
       controller.signal.throwIfAborted()
       createMediaWindow()
       await mediaPlayback.speak('', controller.signal, bytes.buffer)
-    } catch {
+    } catch (error) {
+      if (error instanceof TTSError) throw error
       throw new TTSError('TTS_FAILED', 'Speech playback could not complete. Please try again.')
     } finally {
       clearTimeout(timer); signal?.removeEventListener('abort', abort)

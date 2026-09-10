@@ -23,13 +23,9 @@ export interface PointingParseResult {
 }
 
 /**
- * Regex matching [POINT:x,y:label] or [POINT:x,y:label:screenN] or [POINT:none] at the end of a response string.
- * Group 1: 'none' OR x coordinate
- * Group 2: y coordinate (optional if 'none')
- * Group 3: element label (optional)
- * Group 4: screen tag e.g. 'screen2' (optional)
+ * Regex matching [POINT:x,y:label] or [POINT:x,y:label:screenN] or [POINT:none].
  */
-const POINT_TAG_REGEX = /\[POINT:\s*(?:(none)|(-?\d+)\s*,\s*(-?\d+))(?:[\s:]+([^:\]]+))?(?:[\s:]+screen(\d+))?\s*\]\s*$/i
+const POINT_TAG_SINGLE_REGEX = /\[POINT:\s*(?:(none)|(?:x=)?(-?\d+)\s*,\s*(?:y=)?(-?\d+))(?:[\s:]+([^:\]]+))?(?:[\s:]+screen(\d+))?\s*\]/i
 
 /**
  * Parses point tags from AI response text and returns clean spoken text and coordinates.
@@ -44,10 +40,15 @@ export function parsePointingCoordinates(responseText: string): PointingParseRes
     }
   }
 
-  const cleanText = responseText.replace(/\[POINT:[^\]]*(?:\]|$)/gi, '').trim()
-  const match = (responseText.match(/\[POINT:/gi)?.length ?? 0) === 1 ? responseText.match(POINT_TAG_REGEX) : null
+  const cleanText = responseText
+    .replace(/(?:\*\*|\*|`)*\[POINT:[^\]]*(?:\]|$)(?:\*\*|\*|`)*/gi, '')
+    .replace(/\s+([.,!?])/g, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
 
-  if (!match) {
+  const allTagMatches = responseText.match(/\[POINT:[^\]]*(?:\]|$)/gi)
+
+  if (!allTagMatches || allTagMatches.length !== 1) {
     return {
       spokenText: cleanText,
       coordinate: null,
@@ -56,39 +57,42 @@ export function parsePointingCoordinates(responseText: string): PointingParseRes
     }
   }
 
-  const tagFullMatch = match[0]
-  const isNone = Boolean(match[1] && match[1].toLowerCase() === 'none')
+  for (const tag of allTagMatches) {
+    const match = tag.match(POINT_TAG_SINGLE_REGEX)
+    if (!match) continue
 
-  // Remove the tag from the spoken text and clean up whitespace
-  const spokenText = responseText.substring(0, responseText.length - tagFullMatch.length).trim()
+    const isNone = Boolean(match[1] && match[1].toLowerCase() === 'none')
 
-  if (isNone) {
-    return {
-      spokenText,
-      coordinate: null,
-      elementLabel: 'none',
-      screenNumber: null
+    if (isNone) {
+      return {
+        spokenText: cleanText,
+        coordinate: null,
+        elementLabel: 'none',
+        screenNumber: null
+      }
     }
-  }
 
-  const x = parseInt(match[2], 10)
-  const y = parseInt(match[3], 10)
-  const label = match[4] ? match[4].trim() : null
-  const screenNumber = match[5] ? parseInt(match[5], 10) : null
+    const x = parseInt(match[2], 10)
+    const y = parseInt(match[3], 10)
+    const label = match[4] ? match[4].trim() : null
+    const screenNumber = match[5] ? parseInt(match[5], 10) : null
 
-  if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || (screenNumber !== null && (!Number.isSafeInteger(screenNumber) || screenNumber < 1))) {
+    if (!Number.isSafeInteger(x) || !Number.isSafeInteger(y) || (screenNumber !== null && (!Number.isSafeInteger(screenNumber) || screenNumber < 1))) {
+      continue
+    }
+
     return {
       spokenText: cleanText,
-      coordinate: null,
-      elementLabel: null,
-      screenNumber: null
+      coordinate: { x, y },
+      elementLabel: label,
+      screenNumber
     }
   }
 
   return {
-    spokenText,
-    coordinate: { x, y },
-    elementLabel: label,
-    screenNumber
+    spokenText: cleanText,
+    coordinate: null,
+    elementLabel: null,
+    screenNumber: null
   }
 }

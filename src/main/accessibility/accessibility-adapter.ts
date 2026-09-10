@@ -9,6 +9,9 @@
  * and automatic password field scrubbing.
  */
 
+import { execFile } from 'node:child_process'
+import { join } from 'node:path'
+import { existsSync } from 'node:fs'
 import { createLogger } from '../logger'
 
 const log = createLogger('accessibility')
@@ -59,21 +62,58 @@ export async function queryAccessibilityTree(): Promise<AccessibilitySnapshot | 
 }
 
 /**
- * Windows-specific UIAutomation query via PowerShell COM automation.
+ * Windows-specific UIAutomation query via isolated helper process (ADR 001).
  * Uses bounded traversal with depth/element limits and password scrubbing.
  */
 async function queryWindowsAccessibility(): Promise<AccessibilitySnapshot> {
-  // Phase 1: Use Electron's built-in accessibility APIs as a lightweight alternative
-  // to the full native helper process (which requires C++ compilation).
-  // This provides basic element info without COM crash risk.
+  const binaryPath = join(__dirname, '../../resources/bin/pip-accessibility-helper.exe')
+  const altBinaryPath = join(__dirname, '../../native/accessibility-win/pip-accessibility-helper.exe')
+  const psPath = join(__dirname, '../../native/accessibility-win/uia_helper.ps1')
+
+  let cmd: string
+  let args: string[]
+
+  if (existsSync(binaryPath)) {
+    cmd = binaryPath
+    args = []
+  } else if (existsSync(altBinaryPath)) {
+    cmd = altBinaryPath
+    args = []
+  } else if (existsSync(psPath)) {
+    cmd = 'powershell.exe'
+    args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', psPath]
+  } else {
+    return queryElectronWindowFallback()
+  }
+
+  return new Promise<AccessibilitySnapshot>((resolve) => {
+    execFile(cmd, args, { timeout: QUERY_TIMEOUT_MS, windowsHide: true }, (error, stdout) => {
+      if (error || !stdout.trim()) {
+        void queryElectronWindowFallback().then(resolve)
+        return
+      }
+      try {
+        const parsed = JSON.parse(stdout.trim()) as AccessibilitySnapshot
+        resolve({
+          timestamp: parsed.timestamp || Date.now(),
+          elements: Array.isArray(parsed.elements) ? parsed.elements.slice(0, MAX_ELEMENTS) : [],
+          truncated: Boolean(parsed.truncated)
+        })
+      } catch {
+        void queryElectronWindowFallback().then(resolve)
+      }
+    })
+  })
+}
+
+async function queryElectronWindowFallback(): Promise<AccessibilitySnapshot> {
   try {
     const { BrowserWindow } = await import('electron')
-    const focused = BrowserWindow.getFocusedWindow()
+    const focused = BrowserWindow?.getFocusedWindow?.()
     if (!focused || focused.isDestroyed()) {
       return { timestamp: Date.now(), elements: [], truncated: false }
     }
 
-    // Query the focused window's accessibility tree via Electron's built-in support
     const title = focused.getTitle()
     const bounds = focused.getBounds()
 

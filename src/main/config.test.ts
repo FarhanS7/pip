@@ -15,7 +15,7 @@ describe('Centralized App Configuration (B06)', () => {
     const config = getAppConfig()
     expect(config.env).toBe('dev')
     expect(config.workerUrl).toBe('http://127.0.0.1:8787')
-    expect(config.sharedSecret).toBe('')
+    expect(config.sharedSecret).toBe('pip-dev-secret-key-2026')
   })
 
   it('respects PIP_WORKER_URL override and strips trailing slashes', () => {

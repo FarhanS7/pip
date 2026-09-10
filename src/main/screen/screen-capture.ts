@@ -77,8 +77,17 @@ export async function captureAllScreens(
     for (let index = 0; index < displays.length; index++) {
       const display = displays[index]
       // Source enumeration order is not display identity.
-      const matches = sources.filter(s => s.display_id === String(display.id))
-      const source = matches.length === 1 ? matches[0] : undefined
+      let matches = sources.filter(s => s.display_id === String(display.id))
+      if (matches.length === 0) {
+        matches = sources.filter(s => Boolean(s.id && (s.id.includes(String(display.id)) || s.id.includes(`screen:${index}`))))
+      }
+      let source = matches.length === 1 ? matches[0] : undefined
+      const hasNoDisplayIds = sources.every(s => !s.display_id || s.display_id === '')
+      if (!source && hasNoDisplayIds && sources.length === displays.length) {
+        source = sources[index]
+      } else if (!source && hasNoDisplayIds && displays.length === 1 && sources.length > 0) {
+        source = sources[0]
+      }
 
       if (!source || !source.thumbnail) {
         log.warn('Missing thumbnail for display', { displayId: display.id, index })
