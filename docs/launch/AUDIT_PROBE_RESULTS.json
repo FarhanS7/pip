@@ -1,0 +1,41 @@
+{
+  "source": "7992ded",
+  "observations": {
+    "panelChannels": {
+      "SETTINGS_GET": "allowed",
+      "DIAGNOSTICS_COLLECT": "denied",
+      "CAPTURE_POLICY_GET": "denied",
+      "CAPTURE_PAUSE": "denied",
+      "CAPTURE_RESUME": "denied",
+      "ONBOARDING_COMPLETE": "denied"
+    },
+    "displayLifecycle": {
+      "listenerCountsAfterRecreate": [
+        1,
+        2,
+        3
+      ],
+      "windowsCreatedForOneAddedDisplay": 3
+    },
+    "unrelatedKeyRelease": {
+      "stateAfterRelease": "processing"
+    },
+    "quotaRace": {
+      "admitted": [
+        true,
+        true
+      ],
+      "intendedReservationCents": 80,
+      "allowedCents": 50,
+      "storedReservationCents": 40
+    },
+    "negativeQuotaAccepted": true,
+    "revocationAfterRotation": {
+      "rotatedAccessRemainsValid": true,
+      "rotatedRefreshRemainsUsable": true
+    },
+    "strictWithoutProtectionAllowsCapture": true,
+    "userPauseLostOnUnlock": true,
+    "claudeTokenLimitAcceptedAsComplete": true
+  }
+}
